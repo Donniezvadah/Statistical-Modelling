@@ -8,7 +8,9 @@
   <link rel="stylesheet" href="css/print.css" media="print" />
   <script>
     window.MathJax = {
-      tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']] },
+      loader: {load: ['[tex]/boldsymbol']},
+      tex: { packages: {'[+]': ['boldsymbol']},
+             inlineMath: [['$','$']], displayMath: [['$$','$$']] },
       options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
     };
   </script>

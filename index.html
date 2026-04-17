@@ -11,7 +11,9 @@
   <!-- MathJax -->
   <script>
     window.MathJax = {
-      tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams', packages: {'[+]': ['boldsymbol']} },
+      loader: {load: ['[tex]/boldsymbol']},
+      tex: { packages: {'[+]': ['boldsymbol']},
+             inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams' },
       options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
     };
   </script>

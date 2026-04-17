@@ -9,7 +9,9 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
   <script>
     window.MathJax = {
+      loader: {load: ['[tex]/boldsymbol']},
       tex: {
+        packages: {'[+]': ['boldsymbol']},
         inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams',
         macros: {
           bbeta:'\\boldsymbol{\\beta}', btheta:'\\boldsymbol{\\theta}',
