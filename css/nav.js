@@ -9,6 +9,22 @@ const NAV_HTML = `
   </a></li>
 </ul>
 <hr class="sidebar-divider">
+<div class="sidebar-section-title">Foundations</div>
+<ul class="sidebar-nav">
+  <li><a href="regression.html" data-page="regression">
+    <span class="nav-number">A</span> Linear Regression
+  </a></li>
+  <li><a href="logistic.html" data-page="logistic">
+    <span class="nav-number">B</span> Logistic Regression
+  </a></li>
+  <li><a href="random-effects.html" data-page="random-effects">
+    <span class="nav-number">C</span> Random Effects
+  </a></li>
+  <li><a href="glms.html" data-page="glms">
+    <span class="nav-number">D</span> GLMs
+  </a></li>
+</ul>
+<hr class="sidebar-divider">
 <div class="sidebar-section-title">Chapters</div>
 <ul class="sidebar-nav">
   <li><a href="model-selection.html" data-page="model-selection">

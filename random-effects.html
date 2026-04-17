@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Random Effects Models — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams',
+        macros: {
+          bbeta: '\\boldsymbol{\\beta}',
+          bb:    '\\mathbf{b}',
+          bY:    '\\mathbf{Y}',
+          bX:    '\\mathbf{X}',
+          bZ:    '\\mathbf{Z}',
+          bV:    '\\mathbf{V}',
+          bI:    '\\mathbf{I}',
+          bD:    '\\mathbf{D}',
+          E:     '\\mathbb{E}',
+          Var:   '\\mathrm{Var}',
+          Cov:   '\\mathrm{Cov}',
+          N:     '\\mathcal{N}'
+        }
+      },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="random-effects">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Foundation C</span>
+        <span class="chapter-tag">Variance Components</span>
+        <span class="chapter-tag">REML</span>
+        <span class="chapter-tag">BLUPs</span>
+        <span class="chapter-tag">lme4</span>
+      </div>
+
+      <h1 class="page-title">Random Effects Models</h1>
+      <p class="lead">
+        When data are clustered — students nested in schools, measurements repeated on the same
+        individual, patients within hospitals — ignoring the clustering structure leads to
+        anti-conservative inference. Random effects models account for between-cluster variability
+        by treating cluster-level parameters as draws from a distribution rather than fixed constants.
+        This chapter builds the theory from the simple one-way model through the full Linear Mixed
+        Model, covering variance components, REML, BLUPs, and practical implementation in R.
+      </p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="fixed-vs-random">1. Fixed vs Random Effects</h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Fixed Effects</th><th>Random Effects</th></tr></thead>
+          <tbody>
+            <tr><td>Levels of interest are <em>all</em> levels in the population</td><td>Levels are a <em>random sample</em> from a large population of levels</td></tr>
+            <tr><td>Estimate a separate parameter for each level</td><td>Estimate the distribution (variance) of level-specific effects</td></tr>
+            <tr><td>Inference applies only to observed levels</td><td>Inference generalises to unobserved levels from the same population</td></tr>
+            <tr><td>Treatment groups, sex, species (discrete, exhaustive)</td><td>Subjects, schools, batches, hospitals (sample from a large pool)</td></tr>
+            <tr><td>$p$ parameters added for $p$ groups</td><td>Only $1$ extra parameter (the variance $\sigma_b^2$)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">The key question: are the levels a population sample?</div>
+        <p>If you want to predict for a <em>new</em> level not seen in the data (new school, new patient),
+        that level is random. If you only care about the exact levels observed, use fixed effects.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="one-way">2. One-Way Random Effects Model</h2>
+
+      <h3 id="model-def">2.1 Model Definition</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 2.1 — One-Way Random Effects Model</div>
+        $$Y_{ij} = \mu + b_i + \varepsilon_{ij}, \quad i = 1,\ldots,m, \quad j = 1,\ldots,n_i,$$
+        <p>where:</p>
+        <ul>
+          <li>$\mu$ is the overall population mean (fixed).</li>
+          <li>$b_i \sim N(0, \sigma_b^2)$ iid — random <em>cluster effects</em> (school $i$'s deviation from $\mu$).</li>
+          <li>$\varepsilon_{ij} \sim N(0, \sigma^2)$ iid — within-cluster errors.</li>
+          <li>$b_i$ and $\varepsilon_{ij}$ are independent.</li>
+        </ul>
+        <p>Total number of observations: $N = \sum_{i=1}^m n_i$. Two variance parameters: $\sigma_b^2$ (between-cluster) and $\sigma^2$ (within-cluster).</p>
+      </div>
+
+      <h3 id="marginal-model">2.2 Marginal and Conditional Distributions</h3>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 2.1 — Marginal Distribution</div>
+        <p>Marginalising over $b_i$:</p>
+        $$Y_{ij} \sim N(\mu,\; \sigma_b^2 + \sigma^2).$$
+        <p>Within cluster $i$, observations are <em>correlated</em>:</p>
+        $$\Cov(Y_{ij}, Y_{ij'}) = \sigma_b^2 \quad (j \neq j'), \qquad \Var(Y_{ij}) = \sigma_b^2 + \sigma^2.$$
+        <p>Between clusters: $\Cov(Y_{ij}, Y_{i'j'}) = 0$ for $i\neq i'$.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof</summary>
+        <div class="callout proof">
+          <div class="callout-title">Proof</div>
+          <p>$\E[Y_{ij}] = \mu + \E[b_i] + \E[\varepsilon_{ij}] = \mu$.</p>
+          <p>$\Var(Y_{ij}) = \Var(b_i) + \Var(\varepsilon_{ij}) = \sigma_b^2 + \sigma^2$.</p>
+          <p>$\Cov(Y_{ij}, Y_{ij'}) = \Cov(b_i+\varepsilon_{ij},\, b_i+\varepsilon_{ij'}) = \Var(b_i) = \sigma_b^2$ for $j\neq j'$. $\square$</p>
+        </div>
+      </details>
+
+      <h3 id="icc">2.3 Intraclass Correlation Coefficient (ICC)</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 2.2 — ICC</div>
+        $$\rho = \frac{\sigma_b^2}{\sigma_b^2 + \sigma^2} = \Cor(Y_{ij}, Y_{ij'}) \in [0, 1).$$
+        <p>The ICC measures the proportion of total variance attributable to between-cluster differences.
+        $\rho$ close to 1 means observations within a cluster are nearly identical;
+        $\rho$ near 0 means clustering is irrelevant and a simple linear model suffices.</p>
+      </div>
+
+      <div class="callout example">
+        <div class="callout-title">Example — School exam scores</div>
+        <p>Suppose $\sigma_b^2 = 25$ (between-school variance) and $\sigma^2 = 75$ (within-school variance).
+        Then $\rho = 25/100 = 0.25$: 25% of variation is school-level. Two students from the same school
+        are correlated at 0.25. Using OLS and ignoring school membership would underestimate SEs by
+        factor $\approx\sqrt{1+(n-1)\rho}$ per cluster.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="variance-estimation">3. Estimating Variance Components</h2>
+
+      <h3 id="moments">3.1 ANOVA / Method of Moments Estimators</h3>
+
+      <p>For balanced data ($n_i = n$), the ANOVA approach equates expected mean squares to their observed values.</p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Source</th><th>df</th><th>SS</th><th>MS</th><th>$\E[\text{MS}]$</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Between clusters</td>
+              <td>$m-1$</td>
+              <td>$n\sum_i(\bar Y_{i\cdot}-\bar Y_{\cdot\cdot})^2$</td>
+              <td>$\text{MS}_B$</td>
+              <td>$\sigma^2 + n\sigma_b^2$</td>
+            </tr>
+            <tr>
+              <td>Within clusters</td>
+              <td>$N-m$</td>
+              <td>$\sum_i\sum_j(Y_{ij}-\bar Y_{i\cdot})^2$</td>
+              <td>$\text{MS}_W$</td>
+              <td>$\sigma^2$</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Method of moments estimators:</p>
+      $$\hat\sigma^2 = \text{MS}_W, \qquad \hat\sigma_b^2 = \frac{\text{MS}_B - \text{MS}_W}{n}.$$
+
+      <div class="callout warning">
+        <div class="callout-title">Negative variance estimates</div>
+        <p>If $\text{MS}_B < \text{MS}_W$, the MOM estimate $\hat\sigma_b^2 < 0$, which is inadmissible.
+        In practice, truncate at zero. This happens when there is less between-cluster variation than expected.
+        REML estimates are constrained to be non-negative.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="lmm">4. The General Linear Mixed Model</h2>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 4.1 — Linear Mixed Model (LMM)</div>
+        $$\bY = \bX\bbeta + \bZ\bb + \beps,$$
+        <p>where:</p>
+        <ul>
+          <li>$\bY \in \mathbb{R}^N$ — response vector.</li>
+          <li>$\bX \in \mathbb{R}^{N\times p}$ — design matrix for <em>fixed effects</em> $\bbeta$.</li>
+          <li>$\bZ \in \mathbb{R}^{N\times q}$ — design matrix for <em>random effects</em> $\bb$.</li>
+          <li>$\bb \sim N(\mathbf{0}, \bD)$ — random effects, covariance matrix $\bD$ (to be estimated).</li>
+          <li>$\beps \sim N(\mathbf{0}, \sigma^2\bI)$ — residual errors, independent of $\bb$.</li>
+        </ul>
+      </div>
+
+      <h3 id="marginal-lmm">4.1 Marginal Distribution of $\bY$</h3>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 4.1 — Marginal Distribution</div>
+        <p>Marginalising over $\bb$:</p>
+        $$\bY \sim N\bigl(\bX\bbeta,\; \bV\bigr), \quad \bV = \bZ\bD\bZ^T + \sigma^2\bI.$$
+        <p>The marginal covariance $\bV$ encodes both the random effects structure and residual error.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof</summary>
+        <div class="callout proof">
+          <div class="callout-title">Proof</div>
+          <p>$\E[\bY] = \bX\bbeta + \bZ\E[\bb] = \bX\bbeta$.</p>
+          $$\Var(\bY) = \bZ\Var(\bb)\bZ^T + \Var(\beps) = \bZ\bD\bZ^T + \sigma^2\bI = \bV. \quad\square$$
+        </div>
+      </details>
+
+      <h3 id="gls">4.2 GLS Estimator of Fixed Effects</h3>
+
+      <p>With known $\bV$, the <strong>Generalised Least Squares (GLS)</strong> estimator of $\bbeta$ is:</p>
+      $$\hat\bbeta_{\text{GLS}} = (\bX^T\bV^{-1}\bX)^{-1}\bX^T\bV^{-1}\bY,$$
+      <p>which is BLUE among all linear unbiased estimators (Gauss–Markov extended to non-identity covariance).
+      In practice $\bV$ is unknown; we plug in $\hat\bV$ (estimated by REML/ML) to get <strong>FGLS</strong>.</p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="reml">5. REML — Restricted Maximum Likelihood</h2>
+
+      <h3 id="ml-problem">5.1 Why Not Plain ML?</h3>
+
+      <p>
+        The ML estimator of variance components ignores the degrees of freedom used to estimate $\bbeta$,
+        leading to <em>downward bias</em> — analogous to dividing by $n$ instead of $n-1$ in the sample
+        variance. With $p$ fixed-effect parameters, the bias factor is $(N-p)/N$.
+      </p>
+
+      <h3 id="reml-def">5.2 The REML Log-Likelihood</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 5.1 — REML</div>
+        <p>REML maximises the likelihood of $N-p$ <em>error contrasts</em> $\mathbf{K}^T\bY$ where
+        $\mathbf{K}^T\bX = \mathbf{0}$ (contrasts orthogonal to $\bX$). The REML log-likelihood is:</p>
+        $$\ell_R(\bD, \sigma^2) = -\frac{1}{2}\log|\bV| - \frac{1}{2}\log|\bX^T\bV^{-1}\bX| - \frac{1}{2}(\bY-\bX\hat\bbeta)^T\bV^{-1}(\bY-\bX\hat\bbeta).$$
+        <p>The second term $-\frac{1}{2}\log|\bX^T\bV^{-1}\bX|$ is the REML correction; it penalises
+        for estimating $\bbeta$, recovering unbiasedness for variance components.</p>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">ML vs REML — when to use each</div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th></th><th>ML</th><th>REML</th></tr></thead>
+            <tbody>
+              <tr><td>Fixed effects</td><td>Use for LRT on fixed effects</td><td>Correct for fixed effects</td></tr>
+              <tr><td>Random effects</td><td>Biased downward</td><td>Less biased; use for LRT on random effects</td></tr>
+              <tr><td>AIC/BIC comparison</td><td>Can compare models with different fixed effects</td><td>Cannot compare models with different fixed effects</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>Rule:</strong> use REML for estimating variance components; refit with ML to compare models differing in fixed-effect structure.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="blups">6. Best Linear Unbiased Predictors (BLUPs)</h2>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 6.1 — BLUP</div>
+        <p>The BLUP of the random effect $\bb$ is the conditional expectation given $\bY$:</p>
+        $$\tilde\bb = \E[\bb \mid \bY] = \bD\bZ^T\bV^{-1}(\bY - \bX\hat\bbeta).$$
+        <p>It minimises $\E[(\bb - \hat\bb)^T(\bb - \hat\bb)]$ among all linear predictors.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Derivation of the BLUP formula</summary>
+        <div class="callout proof">
+          <div class="callout-title">Derivation</div>
+          <p>The joint distribution of $(\bb, \bY)$ is:
+          $\bb \sim N(\mathbf{0},\bD)$ and $\bY\mid\bb \sim N(\bX\bbeta+\bZ\bb, \sigma^2\bI)$.
+          By the multivariate normal conditional formula:</p>
+          $$\bb \mid \bY \sim N\!\left(\bD\bZ^T\bV^{-1}(\bY-\bX\bbeta),\;\bD - \bD\bZ^T\bV^{-1}\bZ\bD\right).$$
+          <p>Replacing unknown $\bbeta$ with $\hat\bbeta$ gives the BLUP. $\square$</p>
+        </div>
+      </details>
+
+      <h3 id="shrinkage">6.1 Shrinkage Interpretation</h3>
+
+      <p>For the one-way model, the BLUP of cluster $i$'s effect is:</p>
+      $$\tilde b_i = \underbrace{\frac{n_i\sigma_b^2}{n_i\sigma_b^2 + \sigma^2}}_{=:\;\lambda_i\;\text{ (shrinkage factor)}}\cdot\underbrace{(\bar Y_{i\cdot} - \hat\mu)}_{\text{raw cluster deviation}}.$$
+
+      <div class="callout note">
+        <div class="callout-title">Why shrinkage is a feature, not a bug</div>
+        <ul>
+          <li>The shrinkage factor $\lambda_i \in (0,1)$: BLUPs are always pulled toward zero (the population mean).</li>
+          <li>$\lambda_i \to 1$ (no shrinkage) when $n_i$ is large or $\sigma_b^2 \gg \sigma^2$ — the cluster has a lot of data or clusters are very different.</li>
+          <li>$\lambda_i \to 0$ (full shrinkage) when $n_i$ is small or $\sigma_b^2 \approx 0$ — sparse clusters borrow strength from the population.</li>
+          <li>BLUPs are <em>empirical Bayes estimates</em>: they shrink toward the prior mean $0$ with a strength determined by the data.</li>
+        </ul>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="henderson">7. Henderson's Mixed Model Equations</h2>
+
+      <p>Henderson (1950) showed that $(\hat\bbeta, \tilde\bb)$ solve the joint linear system:</p>
+
+      $$\begin{pmatrix}\bX^T\bX & \bX^T\bZ \\ \bZ^T\bX & \bZ^T\bZ + \sigma^2\bD^{-1}\end{pmatrix}\begin{pmatrix}\hat\bbeta \\ \tilde\bb\end{pmatrix} = \begin{pmatrix}\bX^T\bY \\ \bZ^T\bY\end{pmatrix}.$$
+
+      <p>This is the mixed-model analogue of the normal equations. Solving this system avoids inverting
+      the $N\times N$ matrix $\bV$, which is crucial for large datasets.</p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="random-slopes">8. Random Slopes — Varying-Coefficient Models</h2>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 8.1 — Random Intercepts and Slopes</div>
+        $$Y_{ij} = (\beta_0 + b_{0i}) + (\beta_1 + b_{1i})x_{ij} + \varepsilon_{ij},$$
+        <p>where $(b_{0i}, b_{1i})^T \sim N(\mathbf{0}, \bD)$ with</p>
+        $$\bD = \begin{pmatrix}\sigma_{b_0}^2 & \sigma_{b_0 b_1} \\ \sigma_{b_0 b_1} & \sigma_{b_1}^2\end{pmatrix}.$$
+        <p>This allows each cluster to have its own intercept <em>and</em> its own slope for $x$,
+        with the cluster-specific slopes drawn from a bivariate normal distribution.</p>
+      </div>
+
+      <p>
+        The correlation $\rho_{01} = \sigma_{b_0b_1}/(\sigma_{b_0}\sigma_{b_1})$ between random intercepts
+        and slopes is of substantive interest. E.g., in education: do schools with higher average
+        performance also show larger benefits of tutoring?
+      </p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="nested-crossed">9. Nested vs Crossed Random Effects</h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Structure</th><th>Description</th><th>lme4 formula</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Nested:</strong> pupils within classes within schools</td>
+              <td>Each lower level belongs to exactly one higher level</td>
+              <td><code>(1|school/class)</code></td>
+            </tr>
+            <tr>
+              <td><strong>Crossed:</strong> students $\times$ items</td>
+              <td>Every student attempts every item; both are random</td>
+              <td><code>(1|student) + (1|item)</code></td>
+            </tr>
+            <tr>
+              <td><strong>Partially crossed</strong></td>
+              <td>Not every combination observed</td>
+              <td><code>(1|student) + (1|item)</code> (same syntax)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="testing">10. Testing Random Effects</h2>
+
+      <p>
+        Testing $H_0\colon\sigma_b^2 = 0$ (no random effect needed) is non-standard because $\sigma_b^2 = 0$
+        is on the <em>boundary</em> of the parameter space. The usual $\chi^2_1$ null distribution for
+        the LRT is anticonservative.
+      </p>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 10.1 — Boundary LRT</div>
+        <p>For $H_0\colon\sigma_b^2=0$, the LRT statistic has the asymptotic null distribution:</p>
+        $$G^2 \sim \tfrac{1}{2}\chi^2_0 + \tfrac{1}{2}\chi^2_1,$$
+        <p>where $\chi^2_0$ is a point mass at 0 with probability $\frac{1}{2}$.
+        The $p$-value is $\frac{1}{2}\Pr(\chi^2_1 > G^2_{\text{obs}})$ — half the usual $p$-value.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="r-code">11. Complete R Example with Annotated Output</h2>
+
+      <pre><code class="language-r">## ── 0. Install / load packages ───────────────────────────────
+# install.packages(c("lme4","lmerTest","lattice","ggplot2"))
+library(lme4)
+library(lmerTest)   # adds p-values to lmer summaries
+library(lattice)
+
+## ── 1. Explore the sleepstudy data ───────────────────────────
+# sleepstudy: reaction time (ms) for 18 subjects over 10 days
+# of sleep deprivation.
+data(sleepstudy)
+head(sleepstudy)
+#   Reaction Days Subject
+# 1    249.6    0     308
+# 2    258.7    1     308
+# 3    250.8    2     308
+
+# Visualise subject-specific trajectories
+xyplot(Reaction ~ Days | Subject, data = sleepstudy,
+       type = c("p","r"), col.line = "steelblue",
+       main = "Reaction time by days of sleep deprivation")
+
+## ── 2. Random intercepts model ───────────────────────────────
+m1 <- lmer(Reaction ~ Days + (1 | Subject), data = sleepstudy)
+summary(m1)
+# Random effects:
+#  Groups   Name        Variance Std.Dev.
+#  Subject  (Intercept) 1378.2   37.12     ← between-subject variance
+#  Residual              960.5   30.99     ← within-subject variance
+# Number of obs: 180, groups: Subject, 18
+#
+# Fixed effects:
+#             Estimate Std. Error df     t value Pr(>|t|)
+# (Intercept)  251.405      9.747 17.0    25.79  < 2e-16 ***
+# Days          10.467      0.804 161.0   13.02  < 2e-16 ***
+
+## ── 3. ICC ───────────────────────────────────────────────────
+icc <- 1378.2 / (1378.2 + 960.5)
+cat("ICC =", round(icc, 3), "\n")
+# ICC = 0.589   ← 59% of variance is between subjects
+
+## ── 4. Random intercepts + slopes model ──────────────────────
+m2 <- lmer(Reaction ~ Days + (Days | Subject), data = sleepstudy)
+summary(m2)
+# Random effects:
+#  Groups   Name        Variance Std.Dev. Corr
+#  Subject  (Intercept) 612.1    24.74
+#           Days         35.1     5.92    0.07   ← near-zero corr
+#  Residual             654.9    25.59
+#
+# Fixed effects:
+#             Estimate Std. Error     df  t value Pr(>|t|)
+# (Intercept)  251.405      6.824   17.0   36.84   <2e-16 ***
+# Days          10.467      1.546   17.0    6.77  3.3e-06 ***
+
+## ── 5. Compare models by LRT (ML fit required) ───────────────
+m1_ml <- lmer(Reaction ~ Days + (1|Subject),
+              data = sleepstudy, REML = FALSE)
+m2_ml <- lmer(Reaction ~ Days + (Days|Subject),
+              data = sleepstudy, REML = FALSE)
+anova(m1_ml, m2_ml)
+# Models:
+#      Df AIC    BIC    logLik deviance  Chisq df p-value
+# m1_ml 4  1802.1 1814.8 -897.0   1794.1
+# m2_ml 6  1763.9 1783.1 -875.9   1751.9  42.14  2 7.1e-10 ***
+# → Strong evidence for random slopes
+
+## ── 6. BLUPs (subject-specific intercepts and slopes) ────────
+ranef(m2)
+# $Subject
+#     (Intercept)    Days
+# 308    2.258     9.199   ← Subject 308 starts higher and rises faster
+# 309  -40.394    -8.620   ← Subject 309 starts lower and degrades less
+# ...
+
+# Random effects with confidence intervals:
+dotplot(ranef(m2, condVar = TRUE))
+
+## ── 7. Test for random slope: boundary-corrected LRT ─────────
+m0 <- lmer(Reaction ~ Days + (1|Subject),
+           data = sleepstudy, REML = TRUE)
+m_slope <- lmer(Reaction ~ Days + (Days|Subject),
+                data = sleepstudy, REML = TRUE)
+# REML-based LRT (comparing random effect structure):
+lrt_stat <- as.numeric(2*(logLik(m_slope) - logLik(m0)))
+# Boundary correction: mixture chi-sq(0) + chi-sq(2) for adding
+# 2 parameters (sigma_slope^2 and correlation)
+# Conservative p-value:
+pval <- 0.5*(1 - pchisq(lrt_stat, df = 1)) +
+        0.5*(1 - pchisq(lrt_stat, df = 2))
+cat("LRT stat =", round(lrt_stat,2), "; p-value =", round(pval,4))
+# LRT stat = 42.04 ; p-value = 0.0000
+
+## ── 8. Predictions ───────────────────────────────────────────
+# Population-level (fixed effects only):
+predict(m2, re.form = NA,
+        newdata = data.frame(Days = 5))[1]
+# [1] 303.7    ← E[Y | Days=5] for an average subject
+
+# Subject-specific (conditional on BLUPs):
+predict(m2, newdata = data.frame(Days = 5, Subject = "308"))
+# [1] 322.3    ← prediction for Subject 308 specifically
+
+## ── 9. Diagnostics ───────────────────────────────────────────
+# Residuals vs fitted
+plot(m2)                    # should show no pattern
+
+# Q-Q of residuals
+qqnorm(resid(m2)); qqline(resid(m2), col = "red")
+
+# Q-Q of random effects (should be normal)
+qqnorm(ranef(m2)$Subject[,"(Intercept)"])
+
+## ── 10. Information criteria (REML fit for variance, ML for model comparison)
+AIC(m1_ml, m2_ml)
+#       df      AIC
+# m1_ml  4  1802.1
+# m2_ml  6  1763.9    ← strongly preferred
+
+## ── 11. Variance components for school data (one-way) ────────
+# Simulate a one-way random effects setup
+set.seed(42)
+school_data <- data.frame(
+  school   = rep(1:20, each = 10),
+  score    = rnorm(200, mean = 60, sd = 10)
+)
+school_data$score <- school_data$score +
+  rep(rnorm(20, 0, 5), each = 10)   # add school effects
+
+m_school <- lmer(score ~ 1 + (1|school),
+                 data = school_data, REML = TRUE)
+as.data.frame(VarCorr(m_school))
+#        grp        var1 var2    vcov    sdcor
+# school (Intercept) <NA>  22.36   4.73   ← sigma_b^2
+# Residual      <NA> <NA>  98.47   9.92   ← sigma^2
+
+# ICC
+vc <- as.data.frame(VarCorr(m_school))
+icc_school <- vc$vcov[1] / sum(vc$vcov)
+cat("ICC (schools) =", round(icc_school, 3), "\n")
+# ICC (schools) = 0.185
+</code></pre>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="diagnostics-section">12. Model Diagnostics for LMMs</h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Check</th><th>What to examine</th><th>Violation</th></tr></thead>
+          <tbody>
+            <tr><td>Residuals vs fitted</td><td>No pattern, constant spread</td><td>Nonlinearity; heteroscedasticity</td></tr>
+            <tr><td>Q–Q of standardised residuals</td><td>Points on diagonal</td><td>Non-normal errors</td></tr>
+            <tr><td>Q–Q of BLUPs $\tilde b_i$</td><td>Normal if normality holds</td><td>Skewed cluster effects</td></tr>
+            <tr><td>BLUPs vs covariates</td><td>No trend</td><td>Omitted interaction or nonlinear cluster effect</td></tr>
+            <tr><td>Scale-location plot</td><td>Flat horizontal</td><td>Variance changes with fitted value</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="key-points">Key Takeaways</h2>
+
+      <div class="key-points">
+        <h3>Summary</h3>
+        <ul>
+          <li>Random effects model between-cluster variability with a variance parameter $\sigma_b^2$, far more parsimonious than separate fixed effects for each cluster.</li>
+          <li>The ICC $\rho = \sigma_b^2/(\sigma_b^2+\sigma^2)$ quantifies clustering strength and the inflation of Type I error if ignored.</li>
+          <li>REML corrects for the downward bias in ML estimates of variance components; use REML for variance estimates, ML for comparing fixed-effect structures.</li>
+          <li>BLUPs $\tilde b_i$ are shrunken versions of cluster deviations — shrinkage is strongest for small clusters and weak between-cluster signal.</li>
+          <li>Testing $\sigma_b^2=0$ uses a boundary mixture $\frac{1}{2}\chi^2_0 + \frac{1}{2}\chi^2_1$; the naive $\chi^2_1$ $p$-value is approximately twice too small.</li>
+          <li>Use <code>lme4::lmer()</code> in R; add <code>lmerTest</code> for Satterthwaite-approximate $t$-tests on fixed effects.</li>
+        </ul>
+      </div>
+
+      <div class="chapter-nav">
+        <a href="logistic.html">
+          <span class="nav-label">← Previous</span>
+          <span class="nav-title">Logistic Regression</span>
+        </a>
+        <a href="glms.html" class="next">
+          <span class="nav-label">Next →</span>
+          <span class="nav-title">Generalised Linear Models</span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+</body>
+</html>

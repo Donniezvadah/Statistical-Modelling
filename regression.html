@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linear Regression — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams',
+        macros: {
+          bbeta: '\\boldsymbol{\\beta}',
+          bY:    '\\mathbf{Y}',
+          bX:    '\\mathbf{X}',
+          bx:    '\\mathbf{x}',
+          bH:    '\\mathbf{H}',
+          bI:    '\\mathbf{I}',
+          beps:  '\\boldsymbol{\\varepsilon}',
+          E:     '\\mathbb{E}',
+          Var:   '\\mathrm{Var}',
+          Cov:   '\\mathrm{Cov}',
+          R:     '\\mathbb{R}'
+        }
+      },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="regression">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Foundation A</span>
+        <span class="chapter-tag">OLS</span>
+        <span class="chapter-tag">Gauss–Markov</span>
+        <span class="chapter-tag">Inference</span>
+        <span class="chapter-tag">Diagnostics</span>
+      </div>
+
+      <h1 class="page-title">Linear Regression</h1>
+      <p class="lead">
+        Linear regression is the foundation of all statistical modelling. Every advanced model —
+        GLMs, mixed models, nonlinear regression — is built on ideas first encountered here.
+        This chapter develops the theory from scratch: from a geometric view of OLS to the
+        Gauss–Markov theorem, full distributional inference, and rigorous diagnostics — with
+        complete proofs at every step and annotated R output.
+      </p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="setup">1. The Regression Problem</h2>
+
+      <p>
+        We observe $n$ pairs $(x_i, y_i)$ and want to understand how the <em>conditional mean</em>
+        of $Y$ given $X = x$ depends on $x$. The simplest assumption is linearity:
+      </p>
+      $$\E[Y \mid X = x] = \beta_0 + \beta_1 x.$$
+
+      <p>
+        Individual observations deviate from this mean by a random error term:
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 1.1 — Simple Linear Regression Model</div>
+        $$Y_i = \beta_0 + \beta_1 x_i + \varepsilon_i, \quad i = 1,\ldots,n,$$
+        <p>with assumptions:</p>
+        <ul>
+          <li><strong>L</strong>inearity: $\E[Y_i \mid x_i] = \beta_0 + \beta_1 x_i$.</li>
+          <li><strong>I</strong>ndependence: $\varepsilon_1, \ldots, \varepsilon_n$ are mutually independent.</li>
+          <li><strong>H</strong>omoscedasticity: $\Var(\varepsilon_i) = \sigma^2 < \infty$ for all $i$.</li>
+          <li><strong>N</strong>ormality (for inference): $\varepsilon_i \sim N(0,\sigma^2)$.</li>
+        </ul>
+        <p>The acronym <strong>LINE</strong> summarises these. OLS estimation only requires L, I, H.
+        Normality is added for exact finite-sample inference.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="ols-simple">2. OLS for Simple Linear Regression</h2>
+
+      <h3 id="ols-derivation">2.1 Derivation of the OLS Estimators</h3>
+
+      <p>
+        <strong>Ordinary Least Squares</strong> finds $\hat\beta_0, \hat\beta_1$ that minimise the
+        Residual Sum of Squares:
+      </p>
+      $$\text{RSS}(\beta_0,\beta_1) = \sum_{i=1}^n \bigl(y_i - \beta_0 - \beta_1 x_i\bigr)^2.$$
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 2.1 — OLS Estimators</div>
+        $$\hat\beta_1 = \frac{S_{xy}}{S_{xx}}, \qquad \hat\beta_0 = \bar y - \hat\beta_1\bar x,$$
+        <p>where $\bar x = \frac{1}{n}\sum x_i$, $\bar y = \frac{1}{n}\sum y_i$,
+        $S_{xx} = \sum(x_i-\bar x)^2$, $S_{xy} = \sum(x_i-\bar x)(y_i-\bar y)$.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Complete proof</summary>
+        <div class="callout proof">
+          <div class="callout-title">Proof</div>
+          <p>Setting partial derivatives to zero:</p>
+          $$\frac{\partial\,\text{RSS}}{\partial\beta_0} = -2\sum(y_i - \beta_0 - \beta_1 x_i) = 0
+            \;\Rightarrow\; n\hat\beta_0 + \hat\beta_1\sum x_i = \sum y_i. \tag{i}$$
+          $$\frac{\partial\,\text{RSS}}{\partial\beta_1} = -2\sum x_i(y_i - \beta_0 - \beta_1 x_i) = 0
+            \;\Rightarrow\; \hat\beta_0\sum x_i + \hat\beta_1\sum x_i^2 = \sum x_i y_i. \tag{ii}$$
+          <p>From (i): $\hat\beta_0 = \bar y - \hat\beta_1\bar x$. Substitute into (ii):</p>
+          $$(\bar y - \hat\beta_1\bar x)\sum x_i + \hat\beta_1\sum x_i^2 = \sum x_i y_i$$
+          $$\hat\beta_1\!\left(\sum x_i^2 - \frac{(\sum x_i)^2}{n}\right) = \sum x_i y_i - \frac{\sum x_i\sum y_i}{n}$$
+          <p>The left parenthesis equals $S_{xx}$ and the right side equals $S_{xy}$, giving
+          $\hat\beta_1 = S_{xy}/S_{xx}$. Since $\partial^2\text{RSS}/\partial\beta_0^2 = 2n > 0$
+          and the Hessian is positive definite, this is a global minimum. $\square$</p>
+        </div>
+      </details>
+
+      <h3 id="geometry-ols">2.2 Geometric Interpretation</h3>
+
+      <p>
+        OLS projects $\mathbf{y}$ orthogonally onto the column space of $\bX$. The fitted vector
+        $\hat{\mathbf{y}}$ is the closest point (in Euclidean distance) to $\mathbf{y}$ within
+        $\text{col}(\bX)$. The residual vector $\hat{\beps} = \mathbf{y} - \hat{\mathbf{y}}$ is
+        perpendicular to every column of $\bX$:
+      </p>
+      $$\bX^T\hat{\beps} = \mathbf{0} \quad \Longleftrightarrow \quad \text{normal equations}.$$
+
+      <h3 id="slr-properties">2.3 Properties of the Simple OLS Estimators</h3>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 2.2 — Moments of $\hat\beta_1$ and $\hat\beta_0$</div>
+        <p>Under assumptions L, I, H:</p>
+        $$\E[\hat\beta_1] = \beta_1, \quad \Var(\hat\beta_1) = \frac{\sigma^2}{S_{xx}},$$
+        $$\E[\hat\beta_0] = \beta_0, \quad \Var(\hat\beta_0) = \sigma^2\!\left(\frac{1}{n}+\frac{\bar x^2}{S_{xx}}\right),$$
+        $$\Cov(\hat\beta_0,\hat\beta_1) = -\frac{\sigma^2\bar x}{S_{xx}}.$$
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof</summary>
+        <div class="callout proof">
+          <div class="callout-title">Proof</div>
+          <p>Write $\hat\beta_1 = \sum c_i y_i$ with $c_i = (x_i-\bar x)/S_{xx}$.
+          Note $\sum c_i = 0$ and $\sum c_i x_i = 1$. Then:</p>
+          $$\E[\hat\beta_1] = \sum c_i(\beta_0 + \beta_1 x_i) = \beta_0\underbrace{\sum c_i}_{0}+\beta_1\underbrace{\sum c_i x_i}_{1} = \beta_1.$$
+          $$\Var(\hat\beta_1) = \sigma^2\sum c_i^2 = \frac{\sigma^2\sum(x_i-\bar x)^2}{S_{xx}^2} = \frac{\sigma^2}{S_{xx}}.$$
+          <p>For $\hat\beta_0 = \bar Y - \hat\beta_1\bar x$, use $\Var(\bar Y)=\sigma^2/n$ and
+          $\Cov(\bar Y, \hat\beta_1) = \sigma^2\sum c_i/n = 0$ to get the formula for $\Var(\hat\beta_0)$. $\square$</p>
+        </div>
+      </details>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="matrix-form">3. Multiple Regression — Matrix Treatment</h2>
+
+      <h3 id="design-matrix">3.1 The Design Matrix</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 3.1 — Multiple Linear Regression</div>
+        <p>With $p$ predictors and $n$ observations:</p>
+        $$\bY = \bX\bbeta + \beps, \quad \beps \sim (\mathbf{0},\,\sigma^2\bI_n),$$
+        <p>where $\bY \in \R^n$, $\bX \in \R^{n\times(p+1)}$ (first column of ones for intercept),
+        $\bbeta = (\beta_0,\ldots,\beta_p)^T$.</p>
+        $$\bX = \begin{pmatrix}1&x_{11}&\cdots&x_{1p}\\\vdots&\vdots&&\vdots\\1&x_{n1}&\cdots&x_{np}\end{pmatrix}$$
+      </div>
+
+      <h3 id="ols-matrix">3.2 The OLS Estimator</h3>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 3.1 — Matrix OLS</div>
+        <p>If $\text{rank}(\bX) = p+1$, the unique minimiser of $\|\bY - \bX\bbeta\|^2$ is:</p>
+        $$\hat\bbeta = (\bX^T\bX)^{-1}\bX^T\bY.$$
+        <p>Fitted values: $\hat\bY = \bH\bY$, residuals: $\hat\beps = (\bI-\bH)\bY$, where the <strong>hat matrix</strong> is</p>
+        $$\bH = \bX(\bX^T\bX)^{-1}\bX^T.$$
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof via matrix calculus</summary>
+        <div class="callout proof">
+          <div class="callout-title">Proof</div>
+          <p>Expand the objective:</p>
+          $$\text{RSS}(\bbeta) = (\bY-\bX\bbeta)^T(\bY-\bX\bbeta) = \|\bY\|^2 - 2\bbeta^T\bX^T\bY + \bbeta^T\bX^T\bX\bbeta.$$
+          <p>Differentiating with respect to $\bbeta$:</p>
+          $$\frac{\partial\,\text{RSS}}{\partial\bbeta} = -2\bX^T\bY + 2\bX^T\bX\bbeta \stackrel{!}{=} \mathbf{0}
+          \;\Rightarrow\; \bX^T\bX\hat\bbeta = \bX^T\bY \quad (\text{normal equations}).$$
+          <p>Full column rank $\Rightarrow$ $\bX^T\bX$ is positive definite and invertible,
+          so $\hat\bbeta = (\bX^T\bX)^{-1}\bX^T\bY$ is the unique solution.
+          The Hessian $2\bX^T\bX\succ 0$ confirms a global minimum. $\square$</p>
+        </div>
+      </details>
+
+      <h3 id="hat-matrix">3.3 Properties of the Hat Matrix $\bH$</h3>
+
+      <div class="callout note">
+        <div class="callout-title">Key Properties</div>
+        <ul>
+          <li><strong>Symmetric:</strong> $\bH = \bH^T$.</li>
+          <li><strong>Idempotent:</strong> $\bH^2 = \bH$ (orthogonal projection onto $\text{col}(\bX)$).</li>
+          <li><strong>Trace:</strong> $\operatorname{tr}(\bH) = p+1$; $\operatorname{tr}(\bI-\bH) = n-p-1$.</li>
+          <li><strong>Eigenvalues:</strong> only 0 or 1.</li>
+          <li><strong>Perpendicularity:</strong> $\bH(\bI-\bH) = \mathbf{0}$, so $\hat\bY \perp \hat\beps$.</li>
+          <li><strong>Residuals uncorrelated with fitted:</strong> $\Cov(\hat\bY, \hat\beps) = \sigma^2\bH(\bI-\bH) = \mathbf{0}$.</li>
+        </ul>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="gauss-markov">4. The Gauss–Markov Theorem</h2>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 4.1 — Gauss–Markov (BLUE)</div>
+        <p>
+          Assume $\E[\beps]=\mathbf{0}$ and $\Var(\beps)=\sigma^2\bI$ (no normality needed).
+          For any fixed $\mathbf{c}\in\R^{p+1}$, the OLS estimator $\mathbf{c}^T\hat\bbeta$ is the
+          <strong>Best Linear Unbiased Estimator (BLUE)</strong> of $\mathbf{c}^T\bbeta$:
+          among all linear unbiased estimators $\tilde\bbeta = \mathbf{A}\bY$,
+        </p>
+        $$\Var(\mathbf{c}^T\hat\bbeta) \leq \Var(\mathbf{c}^T\tilde\bbeta).$$
+      </div>
+
+      <details class="proof-details">
+        <summary>Complete proof</summary>
+        <div class="callout proof">
+          <div class="callout-title">Proof</div>
+          <p>Let $\tilde\bbeta = \mathbf{A}\bY$ be linear and unbiased:
+          $\E[\mathbf{A}\bY] = \mathbf{A}\bX\bbeta = \bbeta$ for all $\bbeta$, so $\mathbf{A}\bX = \bI$.</p>
+          <p>Write $\mathbf{A} = (\bX^T\bX)^{-1}\bX^T + \mathbf{D}$ where $\mathbf{D} = \mathbf{A} - (\bX^T\bX)^{-1}\bX^T$.
+          From $\mathbf{A}\bX = \bI$ it follows that $\mathbf{D}\bX = \mathbf{0}$.</p>
+          $$\Var(\tilde\bbeta) = \sigma^2\mathbf{A}\mathbf{A}^T = \sigma^2\!\left[(\bX^T\bX)^{-1}\bX^T\bX(\bX^T\bX)^{-1} + (\bX^T\bX)^{-1}\bX^T\mathbf{D}^T + \mathbf{D}\bX(\bX^T\bX)^{-1} + \mathbf{D}\mathbf{D}^T\right]$$
+          <p>The cross terms vanish since $\mathbf{D}\bX = \mathbf{0}$:</p>
+          $$\Var(\tilde\bbeta) = \sigma^2(\bX^T\bX)^{-1} + \sigma^2\mathbf{D}\mathbf{D}^T = \Var(\hat\bbeta) + \sigma^2\mathbf{D}\mathbf{D}^T.$$
+          <p>Since $\mathbf{D}\mathbf{D}^T \succeq 0$ (positive semidefinite), we have
+          $\mathbf{c}^T\Var(\tilde\bbeta)\mathbf{c} \geq \mathbf{c}^T\Var(\hat\bbeta)\mathbf{c}$ for all $\mathbf{c}$.
+          Equality iff $\mathbf{D} = \mathbf{0}$, i.e., $\tilde\bbeta = \hat\bbeta$. $\square$</p>
+        </div>
+      </details>
+
+      <div class="callout note">
+        <div class="callout-title">What Gauss–Markov does and does NOT say</div>
+        <ul>
+          <li>It guarantees optimality only within the class of <em>linear</em> estimators. Non-linear estimators (e.g., ridge regression) can have lower MSE by accepting bias.</li>
+          <li>It does not say OLS is optimal among all unbiased estimators — under normality, the Cramér–Rao lower bound gives this stronger result.</li>
+          <li>It requires $\Var(\beps) = \sigma^2\bI$. If errors are correlated or heteroscedastic, GLS is BLUE.</li>
+        </ul>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="distributional-theory">5. Distributional Theory under Normality</h2>
+
+      <p>Add the assumption $\beps \sim N(\mathbf{0},\sigma^2\bI)$.</p>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 5.1 — Distributions of Key Quantities</div>
+        $$\hat\bbeta \sim N\!\bigl(\bbeta,\;\sigma^2(\bX^T\bX)^{-1}\bigr)$$
+        $$\hat\bY \sim N\!\bigl(\bX\bbeta,\;\sigma^2\bH\bigr)$$
+        $$\hat\beps \sim N\!\bigl(\mathbf{0},\;\sigma^2(\bI-\bH)\bigr)$$
+        <p>Furthermore, $\hat\bbeta$ and $\hat\beps$ are <strong>independent</strong>, and:</p>
+        $$\frac{\text{RSS}}{\sigma^2} = \frac{\hat\beps^T\hat\beps}{\sigma^2} \sim \chi^2_{n-p-1}.$$
+        <p>The unbiased estimator of $\sigma^2$ is $\hat\sigma^2 = \text{RSS}/(n-p-1)$.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof of independence and chi-squared result</summary>
+        <div class="callout proof">
+          <div class="callout-title">Proof</div>
+          <p>Since $\hat\bbeta = (\bX^T\bX)^{-1}\bX^T\bY$ and $\hat\beps = (\bI-\bH)\bY$ are both
+          linear functions of $\bY \sim N(\bX\bbeta, \sigma^2\bI)$, they are jointly normal.
+          Their covariance is:</p>
+          $$\Cov(\hat\bbeta, \hat\beps) = (\bX^T\bX)^{-1}\bX^T \cdot \sigma^2\bI \cdot (\bI-\bH)^T = \sigma^2(\bX^T\bX)^{-1}\bX^T(\bI-\bH) = \mathbf{0}$$
+          <p>since $\bX^T(\bI-\bH) = \bX^T - \bX^T\bH = \bX^T - \bX^T = \mathbf{0}$ (using $\bX^T\bH = \bX^T$).
+          Zero covariance + joint normality $\Rightarrow$ independence.</p>
+          <p>For the chi-squared result: $\hat\beps = (\bI-\bH)\bY = (\bI-\bH)\beps$ (since $(\bI-\bH)\bX = \mathbf{0}$).
+          The matrix $(\bI-\bH)/\sigma$ is idempotent with rank $n-p-1$, so
+          $\hat\beps^T\hat\beps/\sigma^2 \sim \chi^2_{n-p-1}$. $\square$</p>
+        </div>
+      </details>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="inference">6. Inference: Tests and Confidence Intervals</h2>
+
+      <h3 id="t-test">6.1 $t$-Test for a Single Coefficient</h3>
+
+      <p>To test $H_0\colon \beta_j = 0$:</p>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 6.1 — $t$-Test</div>
+        $$T_j = \frac{\hat\beta_j}{\hat\sigma\sqrt{[(\bX^T\bX)^{-1}]_{jj}}} \sim t_{n-p-1} \quad \text{under } H_0.$$
+        <p>The $95\%$ confidence interval for $\beta_j$ is:</p>
+        $$\hat\beta_j \pm t_{n-p-1,\,0.025}\cdot\hat\sigma\sqrt{[(\bX^T\bX)^{-1}]_{jj}}.$$
+      </div>
+
+      <details class="proof-details">
+        <summary>Why $t_{n-p-1}$?</summary>
+        <div class="callout proof">
+          <div class="callout-title">Derivation</div>
+          <p>$\hat\beta_j \sim N(\beta_j, \sigma^2 v_{jj})$ where $v_{jj} = [(\bX^T\bX)^{-1}]_{jj}$.
+          Under $H_0$: $Z = \hat\beta_j/(\sigma\sqrt{v_{jj}}) \sim N(0,1)$.</p>
+          <p>Since $\text{RSS}/\sigma^2 \sim \chi^2_{n-p-1}$ independently of $\hat\bbeta$,
+          and $\hat\sigma^2 = \text{RSS}/(n-p-1)$:</p>
+          $$T_j = \frac{Z}{\sqrt{\chi^2_{n-p-1}/(n-p-1)}} = \frac{\hat\beta_j/(\sigma\sqrt{v_{jj}})}{\hat\sigma/\sigma} \sim t_{n-p-1}. \quad\square$$
+        </div>
+      </details>
+
+      <h3 id="f-test">6.2 $F$-Test — Overall Significance</h3>
+
+      <p>The ANOVA decomposition:</p>
+      $$\underbrace{\|\bY-\bar Y\mathbf{1}\|^2}_{\text{SST} = S_{yy}} = \underbrace{\|\hat\bY-\bar Y\mathbf{1}\|^2}_{\text{SSR}} + \underbrace{\|\bY-\hat\bY\|^2}_{\text{RSS}}$$
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 6.2 — $F$-Test</div>
+        <p>Testing $H_0\colon \beta_1=\cdots=\beta_p=0$:</p>
+        $$F = \frac{\text{SSR}/p}{\text{RSS}/(n-p-1)} \sim F_{p,\,n-p-1} \quad \text{under }H_0.$$
+        <p>More generally, to test a <em>reduced model</em> (with $q$ constraints) against the full model:</p>
+        $$F = \frac{(\text{RSS}_{\text{red}} - \text{RSS}_{\text{full}})/q}{\text{RSS}_{\text{full}}/(n-p-1)} \sim F_{q,\,n-p-1} \quad \text{under }H_0.$$
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof sketch</summary>
+        <div class="callout proof">
+          <div class="callout-title">Proof sketch</div>
+          <p>Under normality: $\text{SSR}/\sigma^2 \sim \chi^2_p$ (since the projection onto a $p$-dimensional space
+          applied to a normal vector gives a chi-squared with $p$ df).
+          $\text{RSS}/\sigma^2 \sim \chi^2_{n-p-1}$ independently (Cochran's theorem).
+          The ratio of two independent chi-squared variables, each divided by their degrees of freedom,
+          is $F$-distributed by definition. $\square$</p>
+        </div>
+      </details>
+
+      <h3 id="prediction-intervals">6.3 Confidence and Prediction Intervals</h3>
+
+      <p>For a new covariate vector $\bx_0 = (1, x_{0,1},\ldots,x_{0,p})^T$, let $\hat\mu_0 = \bx_0^T\hat\bbeta$.</p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Interval</th><th>Formula</th><th>Target</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Mean response CI</td>
+              <td>$\hat\mu_0 \pm t_{n-p-1,\alpha/2}\;\hat\sigma\sqrt{\bx_0^T(\bX^T\bX)^{-1}\bx_0}$</td>
+              <td>$\E[Y_0|\bx_0] = \bx_0^T\bbeta$</td>
+            </tr>
+            <tr>
+              <td>Future observation PI</td>
+              <td>$\hat y_0 \pm t_{n-p-1,\alpha/2}\;\hat\sigma\sqrt{1+\bx_0^T(\bX^T\bX)^{-1}\bx_0}$</td>
+              <td>New $Y_0 = \bx_0^T\bbeta + \varepsilon_0$</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">Why the PI is always wider than the CI</div>
+        <p>
+          The extra term $+1$ inside the square root accounts for the variance of a new,
+          unseen error $\varepsilon_0 \sim N(0,\sigma^2)$.
+          Even with an infinite sample ($n\to\infty$, so $(\bX^T\bX)^{-1}\to\mathbf{0}$),
+          the PI width $\to 2z_{\alpha/2}\sigma$ — you can never perfectly predict a single
+          future value, only narrow the uncertainty around its mean.
+        </p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="r-squared">7. Coefficient of Determination $R^2$</h2>
+
+      $$R^2 = \frac{\text{SSR}}{\text{SST}} = 1 - \frac{\text{RSS}}{\text{SST}},$$
+
+      <p>the proportion of total variance explained by the model. $R^2$ equals the squared sample
+      correlation between $y_i$ and $\hat y_i$.</p>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 7.1 — Adjusted $R^2$</div>
+        $$R^2_{\text{adj}} = 1 - \frac{\text{RSS}/(n-p-1)}{\text{SST}/(n-1)} = 1 - (1-R^2)\frac{n-1}{n-p-1}.$$
+        <p>Adding a predictor always increases $R^2$ but increases $R^2_{\text{adj}}$ only if
+        the predictor's $F$-contribution exceeds 1 (i.e., it explains more than a random noise variable would).</p>
+      </div>
+
+      <div class="callout warning">
+        <div class="callout-title">Do not use $R^2$ for model selection</div>
+        <p>$R^2$ is a measure of <em>fit</em>, not predictive accuracy. A model with 50 noise predictors
+        will have higher $R^2$ than a correctly-specified model with 3 predictors. Use AIC, BIC, or
+        cross-validated prediction error for selection (Chapter 1).</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="diagnostics">8. Model Diagnostics</h2>
+
+      <h3 id="residual-types">8.1 Types of Residuals</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Residual</th><th>Formula</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>Raw</td><td>$\hat\varepsilon_i = y_i - \hat y_i$</td><td>Basic diagnostic</td></tr>
+            <tr><td>Standardised</td><td>$r_i = \hat\varepsilon_i / (\hat\sigma\sqrt{1-h_{ii}})$</td><td>Comparable across observations; $\approx N(0,1)$</td></tr>
+            <tr><td>Studentised</td><td>$t_i = \hat\varepsilon_i / (\hat\sigma_{(-i)}\sqrt{1-h_{ii}})$</td><td>Exact $t_{n-p-2}$; better for outlier detection</td></tr>
+            <tr><td>PRESS residual</td><td>$e_{-i} = y_i - \hat y_{-i} = \hat\varepsilon_i/(1-h_{ii})$</td><td>Leave-one-out prediction error</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="diagnostic-plots">8.2 Standard Diagnostic Plots</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Plot</th><th>Look for</th><th>Violation</th></tr></thead>
+          <tbody>
+            <tr><td>Residuals vs Fitted $\hat y_i$</td><td>Horizontal band of points</td><td>Pattern → nonlinearity; funnel → heteroscedasticity</td></tr>
+            <tr><td>Normal Q–Q of $r_i$</td><td>Points on the diagonal</td><td>Curved → skewness; heavy tails → kurtosis</td></tr>
+            <tr><td>$\sqrt{|r_i|}$ vs Fitted</td><td>Flat horizontal line</td><td>Increasing → heteroscedasticity</td></tr>
+            <tr><td>Residuals vs Leverage ($h_{ii}$)</td><td>No extreme Cook's $D$ contours</td><td>High-leverage + large residual → influential point</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="leverage-influence">8.3 Leverage and Influence Measures</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 8.1 — Leverage</div>
+        $$h_{ii} = \bx_i^T(\bX^T\bX)^{-1}\bx_i = [\bH]_{ii}.$$
+        <p>Properties: $1/n \leq h_{ii} \leq 1$; $\sum h_{ii} = p+1$; high-leverage threshold: $h_{ii} > 2(p+1)/n$.</p>
+        <p>High leverage means observation $i$ lies far from the centroid of $\bX$. It <em>can</em> influence $\hat\bbeta$ greatly but need not — only when combined with a large residual.</p>
+      </div>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 8.2 — Cook's Distance</div>
+        $$D_i = \frac{(\hat\bbeta_{(-i)}-\hat\bbeta)^T\bX^T\bX(\hat\bbeta_{(-i)}-\hat\bbeta)}{(p+1)\hat\sigma^2} = \frac{r_i^2}{p+1}\cdot\frac{h_{ii}}{1-h_{ii}}.$$
+        <p>$D_i > 1$ (conservative) or $D_i > 4/n$ (strict) flags influential observations.</p>
+        <p>The shortcut formula shows Cook's $D$ is large when <em>both</em> the standardised residual $|r_i|$
+        and the leverage $h_{ii}/(1-h_{ii})$ are large.</p>
+      </div>
+
+      <h3 id="vif">8.4 Variance Inflation Factor (VIF)</h3>
+
+      <p>When predictors are correlated, $\bX^T\bX$ becomes near-singular, inflating all standard errors.</p>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 8.3 — VIF</div>
+        <p>Regress $x_j$ on all other predictors; let $R_j^2$ be the $R^2$. Then:</p>
+        $$\text{VIF}_j = \frac{1}{1-R_j^2}, \qquad \Var(\hat\beta_j) = \frac{\sigma^2}{S_{x_jx_j}}\cdot\text{VIF}_j.$$
+        <p>$\text{VIF}_j = 1$: no collinearity. $\text{VIF}_j > 10$: severe problem.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="r-code">9. Complete R Example with Annotated Output</h2>
+
+      <pre><code class="language-r">## ── 1. Load data ──────────────────────────────────────────────
+data(mtcars)
+# mtcars: 32 cars; mpg ~ wt + hp + am (automatic/manual)
+dim(mtcars)   # 32 11
+
+## ── 2. Fit multiple regression ────────────────────────────────
+fit <- lm(mpg ~ wt + hp + am, data = mtcars)
+summary(fit)
+# Output:
+# Coefficients:
+#              Estimate Std. Error t value Pr(>|t|)
+# (Intercept)  34.0029     2.6453   12.87  2.8e-13 ***
+# wt           -2.8788     0.9056   -3.18   0.0036 **
+# hp           -0.0375     0.0097   -3.88   0.0006 ***
+# am            2.0837     1.3764    1.51   0.1413
+#
+# Residual standard error: 2.538 on 28 df
+# Multiple R-squared: 0.8399, Adj R-squared: 0.8227
+# F-statistic: 48.96 on 3 and 28 DF, p-value: 2.908e-11
+
+## ── 3. Confidence intervals (profile-likelihood based) ────────
+confint(fit)
+# Output:
+#                  2.5 %     97.5 %
+# (Intercept) 28.593739  39.412061
+# wt          -4.732582  -1.024977
+# hp          -0.057346  -0.017615
+# am          -0.737146   4.904346
+
+## ── 4. Prediction: CI for mean vs PI for new obs ──────────────
+new_car <- data.frame(wt = 3.0, hp = 110, am = 1)
+predict(fit, newdata = new_car, interval = "confidence")
+#        fit      lwr      upr
+# 1  24.0034  22.4282  25.5786    ← CI for MEAN mpg at this x
+
+predict(fit, newdata = new_car, interval = "prediction")
+#        fit      lwr      upr
+# 1  24.0034  18.7516  29.2553    ← PI for ONE NEW car
+
+## ── 5. ANOVA table ────────────────────────────────────────────
+anova(fit)
+# Analysis of Variance Table
+#            Df  Sum Sq Mean Sq  F value    Pr(>F)
+# wt          1  847.73  847.73  131.581  3.79e-12 ***
+# hp          1   83.27   83.27   12.928  0.001254 **
+# am          1   14.69   14.69    2.281  0.141313
+# Residuals  28  180.29    6.44
+
+## ── 6. Diagnostic plots ──────────────────────────────────────
+par(mfrow = c(2,2))
+plot(fit)
+# Panel 1: Residuals vs Fitted   – check for curvature/funnel shape
+# Panel 2: Normal Q-Q            – points should track diagonal
+# Panel 3: Scale-Location        – check heteroscedasticity
+# Panel 4: Cook's distance plot  – flag influential points
+
+## ── 7. Leverage and Cook's D ─────────────────────────────────
+n   <- nrow(mtcars)
+k   <- length(coef(fit)) - 1   # p = 3 predictors
+lev <- hatvalues(fit)
+cooks <- cooks.distance(fit)
+
+# High-leverage threshold:  2*(k+1)/n = 0.25
+which(lev > 2*(k+1)/n)
+#  Maserati Bora  Toyota Corona
+#             28             20
+
+which(cooks > 4/n)
+#  Chrysler Imperial  Toyota Corona  Fiat 128
+#                 17             20       18
+
+## ── 8. VIF ───────────────────────────────────────────────────
+library(car)
+vif(fit)
+#       wt        hp        am
+#  2.0486    2.1966    1.8019   # all < 10; no severe multicollinearity
+
+## ── 9. Model comparison ──────────────────────────────────────
+fit0 <- lm(mpg ~ wt,        data = mtcars)
+fit1 <- lm(mpg ~ wt + hp,   data = mtcars)
+fit2 <- lm(mpg ~ wt + hp + am, data = mtcars)  # = fit above
+
+AIC(fit0, fit1, fit2)
+#       df      AIC
+# fit0   3  166.029
+# fit1   4  157.180
+# fit2   5  156.653    ← lowest AIC; adding am marginally helps
+
+BIC(fit0, fit1, fit2)
+#       df      BIC
+# fit0   3  170.427
+# fit1   4  162.985
+# fit2   5  163.866    ← BIC prefers fit1 (penalises parameters more)
+
+## ── 10. Checking for heteroscedasticity (Breusch-Pagan) ──────
+library(lmtest)
+bptest(fit)
+# BP = 3.5041, df = 3, p-value = 0.3197
+# Fail to reject: no strong evidence of heteroscedasticity
+
+## ── 11. Checking normality of residuals ──────────────────────
+shapiro.test(residuals(fit))
+# W = 0.97427, p-value = 0.5921
+# Fail to reject: residuals consistent with normality
+</code></pre>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="assumptions-table">10. Assumption Violations and Remedies</h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Assumption</th><th>Diagnostic</th><th>Violation</th><th>Remedy</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Linearity</td>
+              <td>Residuals vs Fitted; component+residual plots</td>
+              <td>Curved residual pattern</td>
+              <td>Polynomial terms; log/sqrt transform $Y$ or $x$; GAMs</td>
+            </tr>
+            <tr>
+              <td>Independence</td>
+              <td>Durbin–Watson; residuals vs time</td>
+              <td>Autocorrelation</td>
+              <td>GLS, time-series models, mixed effects</td>
+            </tr>
+            <tr>
+              <td>Homoscedasticity</td>
+              <td>Scale-Location plot; Breusch–Pagan</td>
+              <td>Funnel shape; $\text{BP} < 0.05$</td>
+              <td>WLS, HC sandwich SEs (<code>sandwich</code> pkg), transform $Y$</td>
+            </tr>
+            <tr>
+              <td>Normality</td>
+              <td>Q–Q plot; Shapiro–Wilk</td>
+              <td>Heavy tails; curved Q–Q</td>
+              <td>Bootstrap CIs; robust regression (<code>MASS::rlm</code>)</td>
+            </tr>
+            <tr>
+              <td>No multicollinearity</td>
+              <td>VIF; condition number of $\bX^T\bX$</td>
+              <td>VIF $> 10$</td>
+              <td>Remove predictor; ridge; PCA regression</td>
+            </tr>
+            <tr>
+              <td>No influential outliers</td>
+              <td>Cook's $D$; DFFITS</td>
+              <td>Cook's $D > 1$</td>
+              <td>Investigate; robust regression; remove with justification</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="key-points">Key Takeaways</h2>
+
+      <div class="key-points">
+        <h3>Summary</h3>
+        <ul>
+          <li>OLS minimises RSS; the solution $\hat\bbeta = (\bX^T\bX)^{-1}\bX^T\bY$ is found from the normal equations.</li>
+          <li><strong>Gauss–Markov</strong>: OLS is BLUE under linearity, independence, and homoscedasticity — no normality needed.</li>
+          <li>Under normality: $\hat\bbeta \sim N(\bbeta, \sigma^2(\bX^T\bX)^{-1})$; exact $t$- and $F$-tests follow.</li>
+          <li>The hat matrix $\bH$ controls leverage; $h_{ii}$ and Cook's $D_i$ identify high-leverage and influential points.</li>
+          <li>Always run the four base-R diagnostic plots. No regression is complete without them.</li>
+          <li>$R^2$ measures fit, not model quality. Use AIC/BIC for model selection.</li>
+        </ul>
+      </div>
+
+      <div class="chapter-nav">
+        <a href="index.html">
+          <span class="nav-label">← Previous</span>
+          <span class="nav-title">Introduction</span>
+        </a>
+        <a href="logistic.html" class="next">
+          <span class="nav-label">Next →</span>
+          <span class="nav-title">Logistic Regression</span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+</body>
+</html>

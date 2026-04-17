@@ -49,13 +49,21 @@ const opts = program.opts();
 // ── Page catalogue ──────────────────────────────────────────────
 const PAGES = [
   { slug: 'index',           title: 'Introduction',                  file: 'index.html'           },
+  // ── Foundations ───────────────────────────────────────────────
+  { slug: 'regression',      title: 'A — Linear Regression',         file: 'regression.html'      },
+  { slug: 'logistic',        title: 'B — Logistic Regression',       file: 'logistic.html'        },
+  { slug: 'random-effects',  title: 'C — Random Effects Models',     file: 'random-effects.html'  },
+  { slug: 'glms',            title: 'D — Generalised Linear Models', file: 'glms.html'            },
+  // ── Core chapters ─────────────────────────────────────────────
   { slug: 'model-selection', title: '1 — Model Selection',           file: 'model-selection.html' },
   { slug: 'beyond-glms',     title: '2 — Beyond GLMs',               file: 'beyond-glms.html'     },
   { slug: 'nonlinear',       title: '3 — Nonlinear Models',          file: 'nonlinear.html'        },
   { slug: 'latent',          title: '4 — Latent Variables',          file: 'latent.html'           },
+  // ── Reference ─────────────────────────────────────────────────
   { slug: 'formulations',    title: 'Model Formulations (Reference)', file: 'formulations.html'    },
   { slug: 'key-readings',    title: 'Key Readings',                  file: 'key-readings.html'     },
   { slug: 'bibliography',    title: 'Bibliography',                  file: 'bibliography.html'     },
+  // ── Labs ──────────────────────────────────────────────────────
   { slug: 'lab1',            title: 'Lab 1 — AIC & BIC',            file: 'lab1.html'             },
   { slug: 'lab2',            title: 'Lab 2 — Linear Mixed Models',  file: 'lab2.html'             },
 ];

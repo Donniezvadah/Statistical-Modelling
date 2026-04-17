@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Logistic Regression — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams',
+        macros: {
+          bbeta: '\\boldsymbol{\\beta}',
+          bY:    '\\mathbf{Y}',
+          bX:    '\\mathbf{X}',
+          bx:    '\\mathbf{x}',
+          bW:    '\\mathbf{W}',
+          bI:    '\\mathbf{I}',
+          E:     '\\mathbb{E}',
+          Var:   '\\mathrm{Var}',
+          Cov:   '\\mathrm{Cov}'
+        }
+      },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="logistic">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Foundation B</span>
+        <span class="chapter-tag">Binary Outcomes</span>
+        <span class="chapter-tag">IRLS</span>
+        <span class="chapter-tag">Odds Ratios</span>
+        <span class="chapter-tag">ROC/AUC</span>
+      </div>
+
+      <h1 class="page-title">Logistic Regression</h1>
+      <p class="lead">
+        When the outcome is binary — event/no-event, diseased/healthy, pass/fail — linear regression
+        gives nonsensical predictions. Logistic regression is the canonical fix: it models the
+        probability of the event through the logit link, respects the $[0,1]$ constraint, and is
+        estimated by maximum likelihood via the elegant IRLS algorithm. This chapter covers every
+        step from first principles, including full derivations, interpretation of odds ratios, ROC
+        analysis, and extensions to multinomial and ordinal outcomes.
+      </p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="why-not-linear">1. Why Not Linear Regression for Binary Outcomes?</h2>
+
+      <p>
+        Let $Y_i \in \{0,1\}$. The <em>linear probability model</em> $\E[Y_i\mid\bx_i]=\bx_i^T\bbeta$ suffers from:
+      </p>
+      <ul>
+        <li><strong>Out-of-range predictions:</strong> $\hat p_i$ can fall outside $[0,1]$.</li>
+        <li><strong>Heteroscedasticity:</strong> $\Var(Y_i)=p_i(1-p_i)$ varies with $i$, violating OLS assumptions.</li>
+        <li><strong>Non-linearity:</strong> for extreme $\bx$, the true probability curve is S-shaped, not straight.</li>
+      </ul>
+
+      <p>
+        The solution is to apply a monotone <em>link function</em> $g$ so that
+        $g(p_i) = \bx_i^T\bbeta$, mapping $p_i\in(0,1)$ to the whole real line.
+      </p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="model">2. The Logistic Regression Model</h2>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 2.1 — Logistic Regression</div>
+        <p>Let $Y_i \mid \bx_i \sim \mathrm{Bernoulli}(p_i)$ independently. The logistic model specifies:</p>
+        $$\mathrm{logit}(p_i) := \log\frac{p_i}{1-p_i} = \eta_i = \bx_i^T\bbeta,$$
+        <p>equivalently, inverting the logit (the <em>logistic/sigmoid</em> function):</p>
+        $$p_i = \sigma(\eta_i) := \frac{e^{\eta_i}}{1+e^{\eta_i}} = \frac{1}{1+e^{-\eta_i}} \in (0,1).$$
+      </div>
+
+      <h3 id="link-comparison">2.1 Comparison of Binary Link Functions</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Link $g(p)$</th><th>$p = g^{-1}(\eta)$</th><th>Latent variable</th><th>Symmetry</th></tr></thead>
+          <tbody>
+            <tr><td>Logit: $\log p/(1-p)$</td><td>$\sigma(\eta) = e^\eta/(1+e^\eta)$</td><td>Logistic$(0,1)$</td><td>Symmetric</td></tr>
+            <tr><td>Probit: $\Phi^{-1}(p)$</td><td>$\Phi(\eta)$</td><td>Normal$(0,1)$</td><td>Symmetric, lighter tails</td></tr>
+            <tr><td>Cloglog: $\log(-\log(1-p))$</td><td>$1-e^{-e^\eta}$</td><td>Extreme value</td><td>Asymmetric; rare events</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Logit and probit give virtually identical fitted probabilities in practice; the logit is preferred for its interpretability (log-odds).</p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="mle">3. Maximum Likelihood Estimation</h2>
+
+      <h3 id="log-lik">3.1 Log-Likelihood</h3>
+
+      <p>The log-likelihood for $n$ independent Bernoulli observations:</p>
+      $$\ell(\bbeta) = \sum_{i=1}^n \bigl[y_i\log p_i + (1-y_i)\log(1-p_i)\bigr]
+        = \sum_{i=1}^n \bigl[y_i\eta_i - \log(1+e^{\eta_i})\bigr].$$
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 3.1 — Concavity of the Log-Likelihood</div>
+        <p>$\ell(\bbeta)$ is <strong>strictly concave</strong> in $\bbeta$ whenever $\bX$ has full column rank.
+        This guarantees a unique global maximum.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof of concavity</summary>
+        <div class="callout proof">
+          <div class="callout-title">Proof</div>
+          <p>The Hessian is $\nabla^2\ell = -\bX^T\bW\bX$ where
+          $\bW = \mathrm{diag}(p_1(1-p_1),\ldots,p_n(1-p_n))$, with all diagonal entries in $(0,\tfrac{1}{4}]$.
+          Since $\bX$ has full column rank, for any $\mathbf{v}\neq\mathbf{0}$:
+          $\mathbf{v}^T\bX^T\bW\bX\mathbf{v} = \|\bW^{1/2}\bX\mathbf{v}\|^2 > 0$ (as $\bW\succ 0$ and $\bX\mathbf{v}\neq\mathbf{0}$).
+          So $\nabla^2\ell \prec 0$ and $\ell$ is strictly concave. $\square$</p>
+        </div>
+      </details>
+
+      <h3 id="score">3.2 Score Equations</h3>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 3.2 — Score Equations</div>
+        $$\mathbf{s}(\bbeta) := \nabla_\bbeta\ell(\bbeta) = \sum_{i=1}^n(y_i - p_i)\bx_i = \bX^T(\mathbf{y}-\mathbf{p}) = \mathbf{0}.$$
+        <p>There is <strong>no closed-form solution</strong> because $\mathbf{p}$ depends non-linearly on $\bbeta$.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Derivation of the score</summary>
+        <div class="callout proof">
+          <div class="callout-title">Derivation</div>
+          <p>$\frac{\partial\ell}{\partial\beta_j} = \sum_i\left[y_i\frac{\partial\eta_i}{\partial\beta_j} - \frac{e^{\eta_i}}{1+e^{\eta_i}}\frac{\partial\eta_i}{\partial\beta_j}\right] = \sum_i x_{ij}(y_i - p_i),$</p>
+          <p>since $\frac{\partial\eta_i}{\partial\beta_j} = x_{ij}$ and $p_i = \sigma(\eta_i)$. $\square$</p>
+        </div>
+      </details>
+
+      <h3 id="fisher-info">3.3 Fisher Information Matrix</h3>
+
+      $$\mathcal{I}(\bbeta) = -\E[\nabla^2\ell] = \bX^T\bW\bX, \quad \bW = \mathrm{diag}\bigl(p_1(1-p_1),\ldots,p_n(1-p_n)\bigr).$$
+
+      <p>Each weight $w_i = p_i(1-p_i)$ is the Bernoulli variance — observations near $p=0.5$ are most informative.</p>
+
+      <h3 id="irls">3.4 IRLS Algorithm</h3>
+
+      <p>Newton–Raphson applied to the score equations becomes a sequence of weighted least squares problems.</p>
+
+      <div class="callout theorem">
+        <div class="callout-title">Algorithm 3.1 — Iteratively Reweighted Least Squares (IRLS)</div>
+        <p>Initialise $\bbeta^{(0)}$ (e.g. all zeros). At iteration $t$:</p>
+        <ol class="steps">
+          <li>Compute $\eta_i^{(t)} = \bx_i^T\bbeta^{(t)}$; $\;p_i^{(t)} = \sigma(\eta_i^{(t)})$; $\;w_i^{(t)} = p_i^{(t)}(1-p_i^{(t)})$.</li>
+          <li>Form the <strong>working response</strong>:
+            $$z_i^{(t)} = \eta_i^{(t)} + \frac{y_i - p_i^{(t)}}{w_i^{(t)}}.$$</li>
+          <li>Update by <strong>weighted OLS</strong>:
+            $$\bbeta^{(t+1)} = \bigl(\bX^T\bW^{(t)}\bX\bigr)^{-1}\bX^T\bW^{(t)}\mathbf{z}^{(t)}.$$</li>
+          <li>Repeat until convergence: $\|\bbeta^{(t+1)}-\bbeta^{(t)}\|_\infty < 10^{-8}$.</li>
+        </ol>
+        <p>This is exactly the Newton–Raphson update
+        $\bbeta^{(t+1)} = \bbeta^{(t)} + [\mathcal{I}(\bbeta^{(t)})]^{-1}\mathbf{s}(\bbeta^{(t)})$
+        rewritten as a WLS problem.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Derivation — from Newton–Raphson to WLS</summary>
+        <div class="callout proof">
+          <div class="callout-title">Derivation</div>
+          <p>Newton–Raphson: $\bbeta^{(t+1)} = \bbeta^{(t)} + (\bX^T\bW^{(t)}\bX)^{-1}\bX^T(\mathbf{y}-\mathbf{p}^{(t)})$.</p>
+          <p>Define $\mathbf{z}^{(t)} = \boldsymbol\eta^{(t)} + (\bW^{(t)})^{-1}(\mathbf{y}-\mathbf{p}^{(t)})$. Then:</p>
+          $$\bX^T\bW^{(t)}\mathbf{z}^{(t)} = \bX^T\bW^{(t)}\boldsymbol\eta^{(t)} + \bX^T(\mathbf{y}-\mathbf{p}^{(t)})
+          = \bX^T\bW^{(t)}\bX\bbeta^{(t)} + \bX^T(\mathbf{y}-\mathbf{p}^{(t)}).$$
+          <p>So $(\bX^T\bW^{(t)}\bX)^{-1}\bX^T\bW^{(t)}\mathbf{z}^{(t)} = \bbeta^{(t)} + (\bX^T\bW^{(t)}\bX)^{-1}\bX^T(\mathbf{y}-\mathbf{p}^{(t)}) = \bbeta^{(t+1)}$. $\square$</p>
+        </div>
+      </details>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="inference">4. Inference</h2>
+
+      <h3 id="wald">4.1 Wald Tests and CIs</h3>
+
+      <p>By asymptotic normality of the MLE:</p>
+      $$\hat\bbeta \xrightarrow{d} N\!\bigl(\bbeta,\;(\bX^T\hat\bW\bX)^{-1}\bigr).$$
+      <p>Wald statistic for $H_0\colon\beta_j=0$: $\;z_j = \hat\beta_j/\mathrm{SE}(\hat\beta_j) \to N(0,1)$ under $H_0$.</p>
+
+      <div class="callout warning">
+        <div class="callout-title">Hauck–Donner effect</div>
+        <p>Wald tests can give <em>anti-conservative</em> $p$-values (too large) when $|\hat\beta_j|$ is very large —
+        the estimated SE explodes. Always prefer the <strong>Likelihood Ratio Test</strong> for logistic regression.</p>
+      </div>
+
+      <h3 id="lrt">4.2 Likelihood Ratio Test (LRT)</h3>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 4.1 — LRT</div>
+        <p>Comparing a reduced model (with $q$ fewer parameters) to the full model:</p>
+        $$G^2 = 2\bigl[\ell(\hat\bbeta_\text{full}) - \ell(\hat\bbeta_\text{red})\bigr] = D_\text{red} - D_\text{full} \xrightarrow{d}\chi^2_q \;\text{ under }H_0,$$
+        <p>where the <strong>deviance</strong> $D = -2\ell(\hat\bbeta)$. Reject $H_0$ if $G^2 > \chi^2_{q,1-\alpha}$.</p>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">Deviance = residual log-likelihood ratio</div>
+        <p>$D = -2\ell(\hat\bbeta)$ measures how far the fitted model is from a saturated model
+        (one parameter per observation). A smaller deviance means better fit.
+        The null deviance $D_0 = -2\ell(\hat\bbeta_0)$ (intercept-only) is the baseline.
+        The explained deviance reduction $D_0 - D$ plays the same role as SSR in linear regression.</p>
+      </div>
+
+      <h3 id="profile-ci">4.3 Profile Likelihood Confidence Intervals</h3>
+
+      <p>Profile likelihood CIs are more accurate than Wald CIs for logistic regression, especially with moderate $n$. For $\beta_j$:</p>
+      $$\text{CI}_{1-\alpha}(\beta_j) = \left\{\beta_j : -2[\ell(\hat\bbeta_{\beta_j}) - \ell(\hat\bbeta)] \leq \chi^2_{1,1-\alpha}\right\},$$
+      <p>where $\hat\bbeta_{\beta_j}$ maximises the likelihood with $\beta_j$ fixed. In R: <code>confint(fit)</code> uses profiling by default.</p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="interpretation">5. Interpreting Coefficients</h2>
+
+      <h3 id="log-odds">5.1 Log-Odds and Odds Ratios</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 5.1 — Odds Ratio</div>
+        <p>A one-unit increase in $x_j$ (others held fixed) changes the log-odds by $\beta_j$:</p>
+        $$\log\frac{p'}{1-p'} - \log\frac{p}{1-p} = \beta_j.$$
+        <p>On the odds scale: $\mathrm{OR}_j = e^{\beta_j}$. Confidence interval: $\exp(\hat\beta_j \pm 1.96\,\mathrm{SE}(\hat\beta_j))$.</p>
+        <ul>
+          <li>OR $> 1$: $x_j$ increases odds of event.</li>
+          <li>OR $= 1$ ($\beta_j = 0$): no association.</li>
+          <li>OR $< 1$: $x_j$ decreases odds of event.</li>
+        </ul>
+      </div>
+
+      <h3 id="marginal-effects">5.2 Marginal Effects on Probability</h3>
+
+      <p>The effect of $x_j$ on probability $p_i$ depends on all other covariates:</p>
+      $$\frac{\partial p_i}{\partial x_j} = \beta_j \cdot p_i(1-p_i).$$
+      <p>This is maximised at $p_i = 0.5$ (where $p(1-p) = 0.25$) and approaches 0 as $p\to 0$ or $p\to 1$.
+      The <strong>Average Marginal Effect (AME)</strong>:</p>
+      $$\widehat{\mathrm{AME}}_j = \frac{1}{n}\sum_{i=1}^n\hat\beta_j\hat p_i(1-\hat p_i).$$
+
+      <div class="callout warning">
+        <div class="callout-title">Odds ratio ≠ risk ratio (except for rare outcomes)</div>
+        <p>For common outcomes ($p > 10\%$), ORs overstate the effect size relative to the risk ratio (RR = $p_1/p_0$). Always report both, or explicitly note the outcome prevalence.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="goodness-of-fit">6. Goodness of Fit</h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Statistic</th><th>Formula</th><th>df under $H_0$</th><th>Use</th></tr></thead>
+          <tbody>
+            <tr><td>Residual deviance</td><td>$-2\ell(\hat\bbeta)$</td><td>$n-p-1$ (grouped data)</td><td>Overall fit check</td></tr>
+            <tr><td>Pearson $\chi^2$</td><td>$\sum(y_i-\hat p_i)^2/[\hat p_i(1-\hat p_i)]$</td><td>$n-p-1$</td><td>Grouped data</td></tr>
+            <tr><td>Hosmer–Lemeshow $C$</td><td>Decile-group Pearson $\chi^2$</td><td>$g-2$ (usually 8)</td><td>Individual binary data</td></tr>
+            <tr><td>McFadden $\rho^2$</td><td>$1-\ell(\hat\bbeta)/\ell(\hat\bbeta_0)$</td><td>—</td><td>Pseudo-$R^2$; 0.2–0.4 = good</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="classification">7. Classification and Model Evaluation</h2>
+
+      <h3 id="confusion">7.1 Confusion Matrix</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th></th><th>Pred = 1</th><th>Pred = 0</th></tr></thead>
+          <tbody>
+            <tr><th>True = 1</th><td>TP</td><td>FN (miss)</td></tr>
+            <tr><th>True = 0</th><td>FP (false alarm)</td><td>TN</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Metric</th><th>Formula</th><th>Also called</th></tr></thead>
+          <tbody>
+            <tr><td>Accuracy</td><td>$(TP+TN)/n$</td><td>—</td></tr>
+            <tr><td>Sensitivity</td><td>$TP/(TP+FN)$</td><td>Recall, Power, TPR</td></tr>
+            <tr><td>Specificity</td><td>$TN/(TN+FP)$</td><td>TNR, $1-$FPR</td></tr>
+            <tr><td>Positive Predictive Value</td><td>$TP/(TP+FP)$</td><td>Precision</td></tr>
+            <tr><td>F1</td><td>$2\cdot\text{PPV}\cdot\text{Sens}/(\text{PPV}+\text{Sens})$</td><td>Harmonic mean of P and R</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="roc-auc">7.2 ROC Curve and AUC</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 7.1 — ROC and AUC</div>
+        <p>The <strong>ROC curve</strong> plots Sensitivity (TPR) against $1-$Specificity (FPR) as the
+        classification threshold $c$ varies from 1 to 0.</p>
+        <p>The <strong>Area Under the Curve (AUC / c-statistic)</strong>:</p>
+        $$\mathrm{AUC} = \Pr(\hat p_i > \hat p_j \mid Y_i=1, Y_j=0) \in [0.5, 1].$$
+        <p>AUC = 0.5: random guessing. AUC = 1: perfect separation. AUC $\geq 0.8$: generally considered good discrimination.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="extensions">8. Extensions</h2>
+
+      <h3 id="multinomial">8.1 Multinomial Logistic Regression</h3>
+
+      <p>For $Y_i \in \{1,\ldots,K\}$ (unordered), using category $K$ as reference:</p>
+      $$\log\frac{\Pr(Y_i=k\mid\bx_i)}{\Pr(Y_i=K\mid\bx_i)} = \bx_i^T\bbeta_k, \quad k=1,\ldots,K-1.$$
+      $$\Pr(Y_i=k\mid\bx_i) = \frac{e^{\bx_i^T\bbeta_k}}{1+\sum_{j=1}^{K-1}e^{\bx_i^T\bbeta_j}},
+      \quad \Pr(Y_i=K\mid\bx_i) = \frac{1}{1+\sum_{j=1}^{K-1}e^{\bx_i^T\bbeta_j}}.$$
+      <p>Fit in R: <code>nnet::multinom()</code>. The $(K-1)\times(p+1)$ parameter matrix is estimated jointly by MLE.</p>
+
+      <h3 id="ordinal">8.2 Proportional Odds Model (Ordinal Outcomes)</h3>
+
+      <p>For ordered $Y_i\in\{1,\ldots,K\}$, the <strong>cumulative logit</strong> model:</p>
+      $$\log\frac{\Pr(Y_i \leq k \mid\bx_i)}{\Pr(Y_i > k \mid\bx_i)} = \alpha_k - \bx_i^T\bbeta, \quad k=1,\ldots,K-1,$$
+      <p>with <em>ordered</em> intercepts $\alpha_1 < \cdots < \alpha_{K-1}$ and a <strong>single</strong> shared $\bbeta$
+      (proportional odds assumption). The OR for $\bbeta_j$ is constant across all $K-1$ cutpoints. Fit in R: <code>MASS::polr()</code>.</p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="separation">9. Complete Separation and Rare Events</h2>
+
+      <div class="callout warning">
+        <div class="callout-title">Complete (and Quasi-complete) Separation</div>
+        <p>If a linear combination of $\bX$ perfectly predicts $Y$, the MLE does not exist: $\|\hat\bbeta\|\to\infty$.
+        Symptoms: enormous SEs, <code>fitted probabilities numerically 0 or 1</code> warning in R.</p>
+        <p><strong>Remedy:</strong> Firth's penalised likelihood adds $-\frac{1}{2}\log|\mathcal{I}(\bbeta)|$
+        (Jeffreys prior) to $\ell(\bbeta)$, yielding a finite estimator. Use <code>logistf::logistf()</code>.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="r-code">10. Complete R Example with Annotated Output</h2>
+
+      <pre><code class="language-r">## ── 1. Data preparation: Titanic survival ─────────────────────
+# install.packages("titanic")
+library(titanic)
+tit <- titanic::titanic_train
+tit$Age[is.na(tit$Age)] <- median(tit$Age, na.rm = TRUE)
+tit$Sex    <- factor(tit$Sex, levels = c("male","female"))
+tit$Pclass <- factor(tit$Pclass)  # 1st, 2nd, 3rd class
+
+## ── 2. Fit logistic regression ────────────────────────────────
+fit <- glm(Survived ~ Age + Sex + Pclass,
+           family = binomial(link = "logit"),
+           data   = tit)
+
+summary(fit)
+# Coefficients:
+#                Estimate Std. Error z value Pr(>|z|)
+# (Intercept)    3.7770     0.4007    9.43  < 2e-16 ***
+# Age           -0.0368     0.0076   -4.84  1.3e-06 ***
+# Sexfemale      2.4720     0.1888   13.09  < 2e-16 ***
+# Pclass2       -1.3154     0.2270   -5.80  6.8e-09 ***
+# Pclass3       -2.5804     0.2143  -12.04  < 2e-16 ***
+#
+# Null deviance: 1186.66  on 890  degrees of freedom
+# Residual deviance:  647.18  on 886  degrees of freedom
+# AIC: 657.18
+
+## ── 3. Odds ratios with 95% profile-likelihood CI ────────────
+OR_table <- exp(cbind(OR = coef(fit), confint(fit)))
+round(OR_table, 3)
+#                   OR   2.5 % 97.5 %
+# (Intercept)   43.637  20.263  96.838
+# Age            0.964   0.950   0.978   ← each year: 3.6% lower odds
+# Sexfemale     11.852   8.257  17.245   ← female: ~12x higher odds survival
+# Pclass2        0.268   0.171   0.416
+# Pclass3        0.076   0.049   0.117   ← 3rd class: 92% lower odds
+
+## ── 4. Likelihood Ratio Test: does Age matter? ───────────────
+fit_no_age <- glm(Survived ~ Sex + Pclass,
+                  family = binomial, data = tit)
+anova(fit_no_age, fit, test = "LRT")
+# Df Deviance Resid. Df Resid. Dev Pr(>Chi)
+# 1   24.45       886     647.18  7.7e-07 ***   ← Age is significant
+
+## ── 5. Predicted probabilities ───────────────────────────────
+tit$phat <- predict(fit, type = "response")
+
+# Probability for a 30-year-old woman in 1st class:
+predict(fit,
+        newdata = data.frame(Age=30, Sex="female", Pclass="1"),
+        type = "response")
+# [1] 0.9756
+
+# vs 30-year-old man in 3rd class:
+predict(fit,
+        newdata = data.frame(Age=30, Sex="male", Pclass="3"),
+        type = "response")
+# [1] 0.0960
+
+## ── 6. Classification performance ───────────────────────────
+tit$yhat <- as.integer(tit$phat >= 0.5)
+
+# Confusion matrix
+table(Predicted = tit$yhat, Actual = tit$Survived)
+#          Actual
+# Predicted   0   1
+#         0 476 103
+#         1  73 239
+
+# Accuracy: (476 + 239) / 891 = 0.802
+# Sensitivity: 239 / (239+103) = 0.699
+# Specificity: 476 / (476+73)  = 0.867
+
+## ── 7. ROC curve and AUC ─────────────────────────────────────
+library(pROC)
+roc_obj <- roc(tit$Survived, tit$phat, quiet = TRUE)
+auc(roc_obj)
+# Area under the curve: 0.8527
+
+plot(roc_obj, col = "steelblue", lwd = 2,
+     main = "ROC curve — Titanic logistic model")
+abline(a = 0, b = 1, lty = 2, col = "grey60")   # random classifier
+
+## ── 8. Pseudo-R² ─────────────────────────────────────────────
+mcfadden <- 1 - deviance(fit) / fit$null.deviance
+cat("McFadden R² =", round(mcfadden, 3), "\n")
+# McFadden R² = 0.454    ← excellent
+
+## ── 9. Average Marginal Effects ──────────────────────────────
+library(margins)
+summary(margins(fit))
+#     factor    AME     SE       z      p   lower  upper
+#        Age -0.0074 0.0015  -4.85  1e-06  -0.010 -0.004
+# Sexfemale   0.4921 0.0262  18.77  0e+00   0.441  0.543
+#    Pclass2 -0.2579 0.0411  -6.27  4e-10  -0.339 -0.177
+#    Pclass3 -0.4970 0.0331 -15.00  0e+00  -0.562 -0.432
+
+## ── 10. Hosmer-Lemeshow goodness-of-fit ──────────────────────
+library(ResourceSelection)
+hoslem.test(tit$Survived, tit$phat, g = 10)
+# X-squared = 9.73, df = 8, p-value = 0.284
+# Fail to reject: model fits well (no evidence of misfit)
+
+## ── 11. Multinomial logistic regression ──────────────────────
+library(nnet)
+fit_multi <- multinom(Species ~ Sepal.Length + Petal.Length,
+                      data = iris, trace = FALSE)
+summary(fit_multi)
+# Relative Risk Ratios:
+exp(coef(fit_multi))
+#            (Intercept) Sepal.Length Petal.Length
+# versicolor    1.33e-06     2.28      30.70
+# virginica     1.15e-14    13.07     107.43
+
+## ── 12. Ordinal logistic (proportional odds) ─────────────────
+library(MASS)
+# Simulate ordered outcome
+set.seed(42)
+dat <- data.frame(
+  y = ordered(sample(1:3, 200, replace = TRUE, prob = c(.3,.4,.3))),
+  x = rnorm(200)
+)
+fit_ord <- polr(y ~ x, data = dat, Hess = TRUE)
+summary(fit_ord)
+exp(coef(fit_ord))   # proportional odds ratios
+</code></pre>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="key-points">Key Takeaways</h2>
+
+      <div class="key-points">
+        <h3>Summary</h3>
+        <ul>
+          <li>Logistic regression models $\Pr(Y=1\mid\bx)$ through the logit link, guaranteeing predictions in $(0,1)$.</li>
+          <li>The log-likelihood is <em>strictly concave</em>; the unique MLE is found by IRLS, which is Newton–Raphson rewritten as weighted least squares.</li>
+          <li>Coefficients are <em>log-odds ratios</em>; exponentiate to get ORs. Marginal effects on probability depend on the baseline probability.</li>
+          <li>Always use the LRT over the Wald test; avoid Wald CIs when $|\hat\beta|$ is large.</li>
+          <li>Use profile likelihood CIs (<code>confint(fit)</code>) rather than Wald CIs.</li>
+          <li>AUC is threshold-independent and the best single summary of discriminative ability.</li>
+          <li>Firth's penalised likelihood resolves complete separation.</li>
+        </ul>
+      </div>
+
+      <div class="chapter-nav">
+        <a href="regression.html">
+          <span class="nav-label">← Previous</span>
+          <span class="nav-title">Linear Regression</span>
+        </a>
+        <a href="random-effects.html" class="next">
+          <span class="nav-label">Next →</span>
+          <span class="nav-title">Random Effects Models</span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+</body>
+</html>

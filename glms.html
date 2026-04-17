@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generalised Linear Models — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams',
+        macros: {
+          bbeta: '\\boldsymbol{\\beta}',
+          bY:    '\\mathbf{Y}',
+          bX:    '\\mathbf{X}',
+          bx:    '\\mathbf{x}',
+          bW:    '\\mathbf{W}',
+          bI:    '\\mathbf{I}',
+          E:     '\\mathbb{E}',
+          Var:   '\\mathrm{Var}',
+          Cov:   '\\mathrm{Cov}'
+        }
+      },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="glms">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Foundation D</span>
+        <span class="chapter-tag">Exponential Family</span>
+        <span class="chapter-tag">Link Functions</span>
+        <span class="chapter-tag">Deviance</span>
+        <span class="chapter-tag">IRLS</span>
+      </div>
+
+      <h1 class="page-title">Generalised Linear Models</h1>
+      <p class="lead">
+        Generalised Linear Models (GLMs) unify regression, logistic regression, Poisson regression,
+        gamma regression, and many more under one elegant framework. The key insight is that all
+        these models share the same estimation algorithm (IRLS) and the same inferential machinery
+        (deviance, LRT, Wald tests) — only the <em>distribution family</em> and <em>link function</em>
+        differ. This chapter builds the entire GLM framework from the exponential family,
+        derives the score equations and Fisher information, explains deviance-based inference,
+        and gives fully worked examples for the most important special cases.
+      </p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="exponential-family">1. The Exponential Family</h2>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 1.1 — Exponential Family (Canonical Form)</div>
+        <p>A distribution belongs to the <strong>exponential family</strong> if its density/pmf can be written as:</p>
+        $$f(y;\,\theta,\phi) = \exp\!\left\{\frac{y\theta - b(\theta)}{a(\phi)} + c(y,\phi)\right\},$$
+        <p>where:</p>
+        <ul>
+          <li>$\theta$ — <strong>canonical (natural) parameter</strong>, depends on the mean $\mu$.</li>
+          <li>$\phi > 0$ — <strong>dispersion parameter</strong> (fixed or estimated separately).</li>
+          <li>$b(\theta)$ — <strong>cumulant function</strong>: generates moments via derivatives.</li>
+          <li>$a(\phi)$ — <strong>dispersion function</strong>, typically $a(\phi) = \phi/w_i$ for observation weight $w_i$.</li>
+          <li>$c(y,\phi)$ — normalising constant (not a function of $\theta$).</li>
+        </ul>
+      </div>
+
+      <h3 id="moments-ef">1.1 Moments from the Cumulant Function</h3>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 1.1 — Mean and Variance from $b(\theta)$</div>
+        $$\E[Y] = \mu = b'(\theta), \qquad \Var(Y) = a(\phi)\,b''(\theta) = a(\phi)\,V(\mu),$$
+        <p>where $V(\mu) = b''(\theta)$ is the <strong>variance function</strong> — the variance as a function of the mean, a key characteristic of each family.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof via moment generating property</summary>
+        <div class="callout proof">
+          <div class="callout-title">Proof</div>
+          <p>The log-likelihood for one observation is $\ell(\theta) = [y\theta - b(\theta)]/a(\phi) + c(y,\phi)$. Since $\int f\,dy = 1$:</p>
+          $$\frac{d}{d\theta}\int f\,dy = 0 \;\Rightarrow\; \int \frac{y - b'(\theta)}{a(\phi)} f\,dy = 0 \;\Rightarrow\; \E[Y] = b'(\theta).$$
+          <p>Differentiating again: $\E\!\left[\left(\frac{Y-b'(\theta)}{a(\phi)}\right)^{\!2}\right] = \frac{b''(\theta)}{a(\phi)}$, giving $\Var(Y) = a(\phi)b''(\theta)$. $\square$</p>
+        </div>
+      </details>
+
+      <h3 id="ef-table">1.2 Common Exponential Family Members</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Family</th><th>$\theta$</th><th>$b(\theta)$</th><th>$a(\phi)$</th><th>$V(\mu)$</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Normal</td><td>$\mu$</td><td>$\theta^2/2$</td><td>$\sigma^2$</td><td>$1$</td></tr>
+            <tr><td>Binomial$(m,p)$</td><td>$\log p/(1-p)$</td><td>$m\log(1+e^\theta)$</td><td>$1$</td><td>$\mu(1-\mu/m)$</td></tr>
+            <tr><td>Poisson</td><td>$\log\mu$</td><td>$e^\theta$</td><td>$1$</td><td>$\mu$</td></tr>
+            <tr><td>Gamma</td><td>$-1/\mu$</td><td>$-\log(-\theta)$</td><td>$1/\nu$</td><td>$\mu^2$</td></tr>
+            <tr><td>Inverse Gaussian</td><td>$-1/(2\mu^2)$</td><td>$-\sqrt{-2\theta}$</td><td>$\sigma^2$</td><td>$\mu^3$</td></tr>
+            <tr><td>Negative Binomial</td><td>$\log p$</td><td>$-r\log(1-e^\theta)$</td><td>$1$</td><td>$\mu + \mu^2/r$</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="three-components">2. The Three Components of a GLM</h2>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 2.1 — Generalised Linear Model</div>
+        <p>A GLM consists of three components:</p>
+        <ol>
+          <li><strong>Random component:</strong> $Y_i \mid \bx_i$ are independent, each from the <em>same exponential family</em> with mean $\mu_i$.</li>
+          <li><strong>Systematic component:</strong> the <em>linear predictor</em> $\eta_i = \bx_i^T\bbeta = \beta_0 + \beta_1x_{i1}+\cdots+\beta_px_{ip}$.</li>
+          <li><strong>Link function:</strong> a monotone differentiable function $g$ such that $g(\mu_i) = \eta_i$, i.e., $\mu_i = g^{-1}(\eta_i)$.</li>
+        </ol>
+      </div>
+
+      <h3 id="canonical-link">2.1 The Canonical Link</h3>
+
+      <p>The <strong>canonical link</strong> sets $\theta_i = \eta_i$ (the canonical parameter equals the linear predictor).
+      It simplifies the score equations and ensures the sufficient statistic $\bX^T\mathbf{y}$ is complete.</p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Family</th><th>Canonical link $g(\mu)$</th><th>$\mu = g^{-1}(\eta)$</th><th>Common alternatives</th></tr></thead>
+          <tbody>
+            <tr><td>Normal</td><td>Identity: $\mu$</td><td>$\eta$</td><td>Log, square root</td></tr>
+            <tr><td>Binomial</td><td>Logit: $\log\mu/(1-\mu)$</td><td>$\sigma(\eta)$</td><td>Probit, cloglog</td></tr>
+            <tr><td>Poisson</td><td>Log: $\log\mu$</td><td>$e^\eta$</td><td>Square root, identity</td></tr>
+            <tr><td>Gamma</td><td>Reciprocal: $1/\mu$</td><td>$1/\eta$</td><td>Log (most common in practice)</td></tr>
+            <tr><td>Inverse Gaussian</td><td>$1/\mu^2$</td><td>$1/\sqrt{\eta}$</td><td>Log, identity</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="estimation">3. Estimation: Score, Fisher Information, IRLS</h2>
+
+      <h3 id="score-glm">3.1 Score Equations</h3>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 3.1 — Score Equations for a GLM</div>
+        $$\mathbf{s}(\bbeta) = \frac{\partial\ell}{\partial\bbeta} = \bX^T\bW(\eta)\,\mathbf{d}(\mu)\odot(\mathbf{y}-\boldsymbol\mu) = \mathbf{0},$$
+        <p>where $\odot$ denotes elementwise product, and the weight for observation $i$ is:</p>
+        $$w_i = \frac{1}{V(\mu_i)\,[g'(\mu_i)]^2\,a(\phi)}.$$
+        <p>For the canonical link, $g'(\mu) = 1/V(\mu)$ and the score simplifies to $\bX^T(\mathbf{y}-\boldsymbol\mu)/a(\phi) = \mathbf{0}$.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Derivation via chain rule</summary>
+        <div class="callout proof">
+          <div class="callout-title">Derivation</div>
+          <p>By the chain rule:</p>
+          $$\frac{\partial\ell}{\partial\beta_j} = \sum_i \frac{\partial\ell_i}{\partial\theta_i}\frac{\partial\theta_i}{\partial\mu_i}\frac{\partial\mu_i}{\partial\eta_i}\frac{\partial\eta_i}{\partial\beta_j}.$$
+          <ul>
+            <li>$\frac{\partial\ell_i}{\partial\theta_i} = (y_i - b'(\theta_i))/a(\phi) = (y_i-\mu_i)/a(\phi)$.</li>
+            <li>$\frac{\partial\theta_i}{\partial\mu_i} = 1/b''(\theta_i) = 1/V(\mu_i)$ (since $\mu = b'(\theta)$ inverted).</li>
+            <li>$\frac{\partial\mu_i}{\partial\eta_i} = 1/g'(\mu_i)$.</li>
+            <li>$\frac{\partial\eta_i}{\partial\beta_j} = x_{ij}$.</li>
+          </ul>
+          <p>Combining: $s_j(\bbeta) = \sum_i \frac{(y_i-\mu_i)x_{ij}}{V(\mu_i)g'(\mu_i)a(\phi)}$. $\square$</p>
+        </div>
+      </details>
+
+      <h3 id="fisher-glm">3.2 Fisher Information</h3>
+
+      $$\mathcal{I}(\bbeta) = \bX^T\bW\bX/a(\phi), \quad w_i = \frac{1}{V(\mu_i)[g'(\mu_i)]^2}.$$
+
+      <h3 id="irls-glm">3.3 IRLS for GLMs</h3>
+
+      <div class="callout theorem">
+        <div class="callout-title">Algorithm 3.1 — IRLS (General GLM)</div>
+        <p>At iteration $t$:</p>
+        <ol class="steps">
+          <li>Compute $\mu_i^{(t)} = g^{-1}(\eta_i^{(t)})$, weights $w_i^{(t)} = [V(\mu_i^{(t)})(g'(\mu_i^{(t)}))^2]^{-1}$.</li>
+          <li>Form the adjusted dependent variable: $z_i^{(t)} = \eta_i^{(t)} + (y_i-\mu_i^{(t)})\,g'(\mu_i^{(t)})$.</li>
+          <li>Update: $\bbeta^{(t+1)} = (\bX^T\bW^{(t)}\bX)^{-1}\bX^T\bW^{(t)}\mathbf{z}^{(t)}$.</li>
+        </ol>
+        <p>This is Newton–Raphson (= Fisher scoring for canonical links), and it is exactly what R's <code>glm()</code> runs.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="deviance">4. Deviance and Goodness of Fit</h2>
+
+      <h3 id="deviance-def">4.1 Definition of Deviance</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 4.1 — Deviance</div>
+        <p>The <strong>deviance</strong> compares the fitted model to the <em>saturated model</em>
+        (one parameter per observation, $\hat\mu_i^{(\text{sat})} = y_i$):</p>
+        $$D(\mathbf{y};\hat\boldsymbol\mu) = 2\bigl[\ell(\mathbf{y};\mathbf{y}) - \ell(\hat\boldsymbol\mu;\mathbf{y})\bigr] = 2\sum_{i=1}^n d_i,$$
+        <p>where $d_i = y_i(\tilde\theta_i - \hat\theta_i) - [b(\tilde\theta_i)-b(\hat\theta_i)]$ is the
+        <em>individual deviance contribution</em>, $\tilde\theta_i$ evaluated at $y_i$, $\hat\theta_i$ at $\hat\mu_i$.</p>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Family</th><th>Deviance $D(\mathbf{y};\hat\boldsymbol\mu)$</th></tr></thead>
+          <tbody>
+            <tr><td>Normal</td><td>$\sum(y_i - \hat\mu_i)^2 = \text{RSS}$</td></tr>
+            <tr><td>Binomial$(m_i,p_i)$</td><td>$2\sum[y_i\log(y_i/\hat\mu_i) + (m_i-y_i)\log((m_i-y_i)/(m_i-\hat\mu_i))]$</td></tr>
+            <tr><td>Poisson</td><td>$2\sum[y_i\log(y_i/\hat\mu_i) - (y_i-\hat\mu_i)]$</td></tr>
+            <tr><td>Gamma</td><td>$2\sum[-\log(y_i/\hat\mu_i) + (y_i-\hat\mu_i)/\hat\mu_i]$</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="analysis-deviance">4.2 Analysis of Deviance — LRT for GLMs</h3>
+
+      <div class="callout theorem">
+        <div class="callout-title">Theorem 4.1 — Analysis of Deviance</div>
+        <p>To compare a reduced model $M_0$ ($q$ fewer parameters) against full model $M_1$:</p>
+        $$G^2 = D_0 - D_1 = \frac{D_0 - D_1}{\phi} \xrightarrow{d} \chi^2_q \quad\text{under }H_0.$$
+        <p>For the normal family with known $\sigma^2$, this is exact; for other families, it is asymptotic.
+        If $\phi$ is estimated, use $F = G^2/(q\hat\phi)$ with an $F_{q, n-p-1}$ approximation.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="residuals">5. Residuals in GLMs</h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Residual type</th><th>Formula</th><th>Use</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Response</strong></td>
+              <td>$y_i - \hat\mu_i$</td>
+              <td>Raw; scale depends on family</td>
+            </tr>
+            <tr>
+              <td><strong>Pearson</strong></td>
+              <td>$(y_i-\hat\mu_i)/\sqrt{V(\hat\mu_i)}$</td>
+              <td>Normalised; sum of squares $= X^2$ (Pearson statistic)</td>
+            </tr>
+            <tr>
+              <td><strong>Deviance</strong></td>
+              <td>$\text{sign}(y_i-\hat\mu_i)\sqrt{2d_i}$</td>
+              <td>Sum of squares $= D$; best for Q–Q plots</td>
+            </tr>
+            <tr>
+              <td><strong>Anscombe</strong></td>
+              <td>Based on variance-stabilising transform</td>
+              <td>Most nearly normal; good for Q–Q</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="overdispersion">6. Overdispersion</h2>
+
+      <p>
+        In real data, the variance often exceeds what the exponential family predicts.
+        For Poisson, $\Var(Y) = \mu$ by definition, but empirically $\Var(Y) \approx \phi\mu$ with $\phi > 1$.
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 6.1 — Overdispersion</div>
+        <p>The data are <strong>overdispersed</strong> relative to the nominal model when
+        $\Var(Y_i) > V(\mu_i)a(\phi_{\text{nominal}})$.
+        An informal diagnostic: if the residual deviance $\gg$ its df, overdispersion is likely.</p>
+        $$\hat\phi = \frac{X^2}{n-p-1} = \frac{\sum(y_i-\hat\mu_i)^2/V(\hat\mu_i)}{n-p-1}.$$
+        <p>If $\hat\phi \gg 1$, multiply all SEs by $\sqrt{\hat\phi}$ (<strong>quasi-likelihood</strong>) or switch to
+        Negative Binomial (for counts) / Beta-Binomial (for proportions).</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="special-glms">7. Special GLMs in Detail</h2>
+
+      <h3 id="poisson">7.1 Poisson Regression</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 7.1 — Poisson Log-Linear Model</div>
+        <p>$Y_i \sim \text{Poisson}(\mu_i)$ with log link: $\log\mu_i = \bx_i^T\bbeta$, so $\mu_i = e^{\bx_i^T\bbeta}$.</p>
+        <ul>
+          <li><strong>Variance function:</strong> $V(\mu) = \mu$ (variance $=$ mean).</li>
+          <li><strong>Deviance:</strong> $D = 2\sum[y_i\log(y_i/\hat\mu_i)-(y_i-\hat\mu_i)]$.</li>
+          <li><strong>Coefficient interpretation:</strong> $e^{\beta_j}$ is the multiplicative factor on the rate for a one-unit increase in $x_j$ — the <strong>incidence rate ratio (IRR)</strong>.</li>
+        </ul>
+      </div>
+
+      <h3 id="offset">7.2 Offsets in Poisson Regression</h3>
+
+      <p>When $Y_i$ counts events over a varying exposure (time, population, area), add an <em>offset</em>:</p>
+      $$\log\mu_i = \log t_i + \bx_i^T\bbeta, \quad \text{i.e., } \mu_i = t_i e^{\bx_i^T\bbeta}.$$
+      <p>The offset $\log t_i$ is included with a coefficient <em>fixed at 1</em>, not estimated.
+      In R: <code>glm(y ~ x + offset(log(t)), family = poisson)</code>.</p>
+
+      <h3 id="gamma">7.3 Gamma Regression</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">Definition 7.2 — Gamma GLM</div>
+        <p>$Y_i \sim \text{Gamma}(\nu, \nu/\mu_i)$ with variance $\Var(Y_i) = \mu_i^2/\nu$ (i.e., $V(\mu) = \mu^2$, constant CV).</p>
+        <ul>
+          <li><strong>Canonical link:</strong> reciprocal $g(\mu) = 1/\mu$; but the <strong>log link</strong> is almost always preferred (ensures $\mu_i > 0$ and gives interpretable multiplicative effects).</li>
+          <li><strong>Applications:</strong> insurance claims, waiting times, any positive continuous response with variance proportional to mean squared.</li>
+        </ul>
+        <p>The shape parameter $\nu$ (= $1/\phi$ in the exponential family parameterisation) is estimated
+        from the Pearson statistic: $\hat\nu = 1/\hat\phi$.</p>
+      </div>
+
+      <h3 id="nb">7.4 Negative Binomial Regression</h3>
+
+      <p>The Negative Binomial adds a quadratic variance term to handle overdispersed counts:</p>
+      $$V(\mu) = \mu + \mu^2/r, \quad r > 0 \text{ (size parameter, estimated)}.$$
+      <p>As $r\to\infty$, NB$\to$Poisson. NB is outside the exponential family (because $r$ is also estimated),
+      so it is fit iteratively — alternating Poisson IRLS for $\bbeta$ given $r$, and moment estimation of $r$.
+      In R: <code>MASS::glm.nb()</code>.</p>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="model-checking">8. Model Checking for GLMs</h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Check</th><th>Plot/Test</th><th>Violation</th></tr></thead>
+          <tbody>
+            <tr><td>Link function</td><td>Smoothed residuals vs linear predictor</td><td>Systematic curve → wrong link</td></tr>
+            <tr><td>Variance function</td><td>$|r_i^{(\text{Pears})}|$ vs $\hat\mu_i$</td><td>Trend → wrong family or overdispersion</td></tr>
+            <tr><td>Normality of deviance residuals</td><td>Q–Q of deviance residuals</td><td>Heavy tails → family misspecification</td></tr>
+            <tr><td>Outliers</td><td>Cook's $D$ for GLMs</td><td>Points $> 1$ → investigate</td></tr>
+            <tr><td>Overdispersion</td><td>$D/\text{df}$ ratio; $\hat\phi$ estimate</td><td>$\hat\phi \gg 1$ → quasi or NB model</td></tr>
+            <tr><td>Zero inflation</td><td>Count frequency vs Poisson predictions</td><td>Too many zeros → ZIP/ZINB model</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="r-code">9. Complete R Examples with Annotated Output</h2>
+
+      <h3 id="r-poisson">9.1 Poisson GLM — Hospital Admissions</h3>
+
+      <pre><code class="language-r">## ── 1. Simulate hospital admission data ──────────────────────
+set.seed(123)
+n <- 200
+age     <- rnorm(n, 55, 15)
+smoker  <- rbinom(n, 1, 0.3)
+# log rate = -2 + 0.03*age + 0.7*smoker
+lambda  <- exp(-2 + 0.03 * age + 0.7 * smoker)
+admits  <- rpois(n, lambda)
+
+dat <- data.frame(admits, age, smoker = factor(smoker))
+
+## ── 2. Fit Poisson GLM ───────────────────────────────────────
+fit_pois <- glm(admits ~ age + smoker,
+                family = poisson(link = "log"),
+                data   = dat)
+summary(fit_pois)
+# Coefficients:
+#              Estimate Std. Error z value Pr(>|z|)
+# (Intercept) -1.9631     0.1923  -10.21  < 2e-16 ***
+# age          0.0302     0.0031    9.72  < 2e-16 ***
+# smoker1      0.6714     0.0861    7.80  6.4e-15 ***
+#
+# Null deviance: 342.87 on 199 df
+# Residual deviance: 193.82 on 197 df
+# AIC: 648.84
+
+## ── 3. Incidence Rate Ratios (IRR) ───────────────────────────
+IRR_table <- exp(cbind(IRR = coef(fit_pois), confint(fit_pois)))
+round(IRR_table, 3)
+#                IRR   2.5 %  97.5 %
+# (Intercept)  0.141   0.096   0.204
+# age          1.031   1.024   1.037   ← each year: 3.1% more admissions
+# smoker1      1.957   1.652   2.322   ← smokers: 96% more admissions
+
+## ── 4. LRT: does smoking matter? ─────────────────────────────
+fit_no_smoke <- glm(admits ~ age, family = poisson, data = dat)
+anova(fit_no_smoke, fit_pois, test = "LRT")
+# Analysis of Deviance Table
+#                Df Deviance Resid.Df Resid.Dev Pr(>Chi)
+# fit_no_smoke                    198    254.96
+# fit_pois       1    61.14      197    193.82  5.5e-15 ***
+
+## ── 5. Check for overdispersion ──────────────────────────────
+phi_hat <- sum(residuals(fit_pois, "pearson")^2) / fit_pois$df.residual
+cat("Dispersion estimate:", round(phi_hat, 2))
+# Dispersion estimate: 0.94    ← close to 1; no overdispersion
+
+## ── 6. Diagnostic plots ──────────────────────────────────────
+par(mfrow = c(2,2))
+plot(fit_pois)
+
+## ── 7. With an offset (rates per 1000 person-years) ─────────
+# Suppose we also have population denominators
+pop <- round(runif(n, 500, 5000))
+fit_rate <- glm(admits ~ age + smoker + offset(log(pop)),
+                family = poisson, data = dat)
+# Coefficients now measure rate per person-year of exposure
+exp(coef(fit_rate)["smoker1"])
+# smoker1: 1.952   ← IRR unchanged by offset (as expected)
+</code></pre>
+
+      <h3 id="r-gamma">9.2 Gamma GLM — Insurance Claim Amounts</h3>
+
+      <pre><code class="language-r">## ── 1. Simulate insurance claim data ─────────────────────────
+set.seed(456)
+n <- 300
+age_ins  <- runif(n, 18, 80)
+car_age  <- runif(n, 0, 20)
+# Log mean claim: 7 + 0.02*age - 0.05*car_age
+log_mu <- 7 + 0.02 * age_ins - 0.05 * car_age
+# Gamma with shape = 3 (moderate CV)
+claims <- rgamma(n, shape = 3, rate = 3 / exp(log_mu))
+
+dat_ins <- data.frame(claims, age_ins, car_age)
+
+## ── 2. Fit Gamma GLM with log link ───────────────────────────
+fit_gamma <- glm(claims ~ age_ins + car_age,
+                 family = Gamma(link = "log"),
+                 data   = dat_ins)
+summary(fit_gamma)
+# Coefficients:
+#               Estimate Std. Error t value Pr(>|t|)
+# (Intercept)  6.979e+00  8.80e-02   79.32  < 2e-16 ***
+# age_ins      2.013e-02  1.42e-03   14.17  < 2e-16 ***
+# car_age     -5.077e-02  4.22e-03  -12.03  < 2e-16 ***
+#
+# (Dispersion parameter for Gamma family: 0.3421)
+#    = 1/hat_nu ≈ 1/3  (correct shape parameter recovered)
+
+## ── 3. Multiplicative effects ────────────────────────────────
+exp(cbind(estimate = coef(fit_gamma), confint(fit_gamma)))
+# 1-year older driver:   1.020  (2% higher claim)
+# 1-year older car:      0.950  (5% lower claim)
+
+## ── 4. Estimated shape parameter ─────────────────────────────
+phi_hat_g <- summary(fit_gamma)$dispersion
+cat("Estimated phi (1/shape):", round(phi_hat_g, 3),
+    "; shape =", round(1/phi_hat_g, 2))
+# Estimated phi (1/shape): 0.342 ; shape = 2.92
+
+## ── 5. Compare Gamma vs log-normal ───────────────────────────
+# Log-normal: treat log(claims) as Gaussian response
+fit_lognormal <- lm(log(claims) ~ age_ins + car_age, data = dat_ins)
+AIC(fit_gamma)      # 4863.2
+AIC(fit_lognormal)  # uses different likelihood scale -- not comparable
+
+# Better: use LOOCV or proper scoring rules for comparison
+</code></pre>
+
+      <h3 id="r-nb">9.3 Negative Binomial — Overdispersed Counts</h3>
+
+      <pre><code class="language-r">## ── 1. Simulate overdispersed count data ─────────────────────
+library(MASS)
+set.seed(789)
+n   <- 250
+x   <- rnorm(n)
+mu  <- exp(1 + 0.5 * x)
+y_nb <- rnegbin(n, mu = mu, theta = 2)   # true NB, theta=2
+
+dat_nb <- data.frame(y = y_nb, x)
+
+## ── 2. Fit Poisson (misspecified) ────────────────────────────
+fit_p  <- glm(y ~ x, family = poisson, data = dat_nb)
+phi_check <- sum(residuals(fit_p,"pearson")^2) / fit_p$df.residual
+cat("Poisson dispersion:", round(phi_check, 2))
+# Poisson dispersion: 1.46    ← clearly > 1; overdispersed
+
+## ── 3. Quasi-Poisson (corrects SEs but not distribution) ─────
+fit_qp <- glm(y ~ x, family = quasipoisson, data = dat_nb)
+summary(fit_qp)$coefficients
+#             Estimate Std. Error t value Pr(>|t|)
+# (Intercept)    1.013     0.0710   14.27  < 2e-16 ***
+# x              0.495     0.0591    8.38  2.8e-15 ***
+# (SEs inflated by sqrt(1.46) compared to Poisson)
+
+## ── 4. Negative Binomial (correct model) ─────────────────────
+fit_nb <- glm.nb(y ~ x, data = dat_nb)
+summary(fit_nb)
+# Coefficients:
+#             Estimate Std. Error z value Pr(>|z|)
+# (Intercept)   1.0147     0.0690   14.71  < 2e-16 ***
+# x             0.4987     0.0575    8.67  < 2e-16 ***
+# Theta: 1.994 (SE: 0.250)   ← recovers true theta ≈ 2
+
+## ── 5. LRT: Poisson vs NB ─────────────────────────────────────
+# 2*(logLik(NB) - logLik(Poisson)) ~ chi-sq(1)
+lrt_nb <- 2*(as.numeric(logLik(fit_nb)) - as.numeric(logLik(fit_p)))
+cat("LRT statistic:", round(lrt_nb, 2), "\n")
+cat("p-value:", pchisq(lrt_nb, 1, lower.tail = FALSE)/2, "\n")
+# LRT statistic: 56.8
+# p-value: 2.3e-14   ← strong evidence for overdispersion
+
+## ── 6. Summary comparison ────────────────────────────────────
+AIC(fit_p, fit_nb)
+#        df      AIC
+# fit_p   2  1182.4
+# fit_nb  3  1127.5    ← NB substantially better
+</code></pre>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="glm-summary-table">10. GLM Cheat Sheet</h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Response</th><th>Family</th><th>Link</th><th>R call</th><th>Interpretation of $e^{\hat\beta_j}$</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Continuous, symmetric</td><td>Normal</td><td>Identity</td><td><code>lm(y~x)</code></td><td>Additive effect (not multiplicative)</td></tr>
+            <tr><td>Binary (0/1)</td><td>Binomial</td><td>Logit</td><td><code>glm(y~x, binomial)</code></td><td>Odds ratio</td></tr>
+            <tr><td>Proportion $(0,1)$</td><td>Binomial$(m)$</td><td>Logit</td><td><code>glm(cbind(s,f)~x, binomial)</code></td><td>Odds ratio</td></tr>
+            <tr><td>Count (Poisson)</td><td>Poisson</td><td>Log</td><td><code>glm(y~x, poisson)</code></td><td>Incidence rate ratio</td></tr>
+            <tr><td>Overdispersed count</td><td>Quasi-Poisson</td><td>Log</td><td><code>glm(y~x, quasipoisson)</code></td><td>IRR (inflated SEs)</td></tr>
+            <tr><td>Overdispersed count</td><td>Neg. Binomial</td><td>Log</td><td><code>MASS::glm.nb(y~x)</code></td><td>IRR (better than quasi)</td></tr>
+            <tr><td>Positive continuous</td><td>Gamma</td><td>Log</td><td><code>glm(y~x, Gamma("log"))</code></td><td>Multiplicative effect on mean</td></tr>
+            <tr><td>Positive, right-skewed</td><td>Inv. Gaussian</td><td>Log</td><td><code>glm(y~x, inverse.gaussian("log"))</code></td><td>Multiplicative effect on mean</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <h2 id="key-points">Key Takeaways</h2>
+
+      <div class="key-points">
+        <h3>Summary</h3>
+        <ul>
+          <li>The exponential family unifies all GLM distributions via $f = \exp\{[y\theta - b(\theta)]/a(\phi) + c(y,\phi)\}$; mean $= b'(\theta)$, variance $= a(\phi)b''(\theta)$.</li>
+          <li>A GLM has three components: random (family), systematic (linear predictor $\bx^T\bbeta$), and link ($g(\mu) = \eta$).</li>
+          <li>All GLMs are estimated by IRLS — the same algorithm as logistic regression, but with family-specific weights $w_i = 1/[V(\mu_i)(g'(\mu_i))^2]$.</li>
+          <li>Inference uses the deviance; the LRT $G^2 = D_0 - D_1 \sim \chi^2_q$ is the GLM analogue of the $F$-test.</li>
+          <li>Check overdispersion (Pearson $\hat\phi \gg 1$); if present, switch to quasi-likelihood (corrects SEs only) or a more flexible family (NB, Beta-Binomial).</li>
+          <li>Choose the family by the response type and variance function; choose the link by the scale on which linearity makes subject-matter sense.</li>
+        </ul>
+      </div>
+
+      <div class="chapter-nav">
+        <a href="random-effects.html">
+          <span class="nav-label">← Previous</span>
+          <span class="nav-title">Random Effects Models</span>
+        </a>
+        <a href="model-selection.html" class="next">
+          <span class="nav-label">Next →</span>
+          <span class="nav-title">Chapter 1 — Model Selection</span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+</body>
+</html>
