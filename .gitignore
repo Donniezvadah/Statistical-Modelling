@@ -1,0 +1,86 @@
+# ─────────────────────────────────────────────────
+#  Donnie — Statistical Modelling
+#  .gitignore
+# ─────────────────────────────────────────────────
+
+# ── Node / npm ────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.npmrc
+
+# ── Generated PDFs ────────────────────────────────
+pdfs/
+*.pdf
+
+# ── Python virtual environments ───────────────────
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# ── OS files ──────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── Editor / IDE ──────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+*.sublime-workspace
+*.sublime-project
+.editorconfig
+
+# ── Logs ──────────────────────────────────────────
+logs/
+*.log
+
+# ── Temp files ────────────────────────────────────
+tmp/
+temp/
+.tmp/
+.cache/
+.parcel-cache/
+
+# ── Environment / secrets ─────────────────────────
+.env
+.env.local
+.env.*.local
+*.secret
+
+# ── Deployment artefacts ──────────────────────────
+.netlify/
+.vercel/
+_site/
+_build/
+site/
+
+# ── R project files (if any R scripts added) ──────
+.Rhistory
+.RData
+.Rprofile
+.Renviron
+*.Rproj.user/
+rsconnect/

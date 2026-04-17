@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Key Readings — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']] },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+  <style>
+    /* ── Reading card component ── */
+    .reading-card {
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 1.4rem 1.6rem;
+      margin: 1.25rem 0;
+      background: var(--bg-body);
+      transition: box-shadow 0.15s;
+      position: relative;
+    }
+    .reading-card:hover { box-shadow: var(--shadow-md); }
+
+    .rc-header {
+      display: flex; gap: 1rem; align-items: flex-start;
+      margin-bottom: 0.9rem;
+    }
+    .rc-level {
+      min-width: 2.2rem; height: 2.2rem;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 0.8rem; color: white;
+      flex-shrink: 0;
+    }
+    .rc-level.l1 { background: #16a34a; }
+    .rc-level.l2 { background: #2563eb; }
+    .rc-level.l3 { background: #9333ea; }
+    .rc-level.l4 { background: #dc2626; }
+
+    .rc-title { font-size: 1rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.15rem; }
+    .rc-author { font-size: 0.85rem; color: var(--text-secondary); margin: 0; }
+    .rc-year   { font-size: 0.78rem; color: var(--text-muted); }
+
+    .rc-meta {
+      display: flex; flex-wrap: wrap; gap: 0.4rem;
+      margin: 0.6rem 0;
+    }
+    .rc-tag {
+      font-size: 0.72rem; padding: 0.15rem 0.55rem;
+      border: 1px solid var(--border-color);
+      border-radius: 99px;
+      background: var(--bg-code);
+      color: var(--text-muted);
+    }
+    .rc-tag.essential { background: #fef9c3; border-color: #ca8a04; color: #854d0e; }
+    .rc-tag.advanced  { background: #ede9fe; border-color: #7c3aed; color: #5b21b6; }
+    .rc-tag.applied   { background: #dcfce7; border-color: #16a34a; color: #14532d; }
+    .rc-tag.theory    { background: #dbeafe; border-color: #2563eb; color: #1e3a8a; }
+
+    .rc-body { font-size: 0.88rem; line-height: 1.7; color: var(--text-secondary); }
+    .rc-body p { margin: 0 0 0.5rem; }
+    .rc-body ul { margin: 0.3rem 0 0.5rem 1.2rem; padding: 0; }
+    .rc-body li { margin-bottom: 0.25rem; }
+
+    .rc-verdict {
+      margin-top: 0.75rem;
+      padding: 0.6rem 0.9rem;
+      background: var(--bg-code);
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--color-primary);
+      font-size: 0.84rem;
+      color: var(--text-primary);
+    }
+    .rc-verdict strong { color: var(--color-primary); }
+
+    /* Difficulty stars */
+    .stars { color: #f59e0b; letter-spacing: 1px; font-size: 0.9rem; }
+    .star-empty { color: var(--border-color); }
+
+    /* Section dividers */
+    .level-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin: 2.5rem 0 1rem;
+    }
+    .level-dot {
+      width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+    }
+    .level-dot.l1 { background: #16a34a; }
+    .level-dot.l2 { background: #2563eb; }
+    .level-dot.l3 { background: #9333ea; }
+    .level-dot.l4 { background: #dc2626; }
+
+    /* Filter bar */
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .filter-btn {
+      background: var(--bg-code); border: 1px solid var(--border-color);
+      border-radius: 99px; padding: 0.3rem 0.85rem;
+      font-size: 0.8rem; cursor: pointer; color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+    .filter-btn.active, .filter-btn:hover {
+      background: var(--color-primary); border-color: var(--color-primary); color: white;
+    }
+
+    /* Reading path timeline */
+    .timeline { list-style: none; margin: 0; padding: 0; }
+    .timeline li {
+      display: flex; gap: 1rem; margin-bottom: 1rem; align-items: flex-start;
+    }
+    .tl-num {
+      min-width: 28px; height: 28px; border-radius: 50%;
+      background: var(--color-primary); color: white;
+      font-size: 0.78rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 2px;
+    }
+    .tl-body { flex: 1; }
+    .tl-title { font-weight: 600; font-size: 0.92rem; }
+    .tl-desc  { font-size: 0.83rem; color: var(--text-secondary); margin-top: 0.15rem; }
+  </style>
+</head>
+<body data-page="key-readings">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Reference</span>
+        <span class="chapter-tag">Key Readings</span>
+        <span class="chapter-tag">Annotated · Levelled · Curated</span>
+      </div>
+
+      <h1 class="page-title">Key Readings</h1>
+      <p class="page-subtitle">
+        A curated, annotated guide to the most important books, papers, and resources
+        — from first principles to the research frontier
+      </p>
+
+      <!-- ── Level legend ─────────────────────────────────── -->
+      <div class="callout note">
+        <div class="callout-title">📚 How to use this guide</div>
+        <p>Every entry is rated on two dimensions:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:1.2rem;margin-top:0.5rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <div class="rc-level l1" style="min-width:1.6rem;height:1.6rem;font-size:0.7rem;">L1</div>
+            <span style="font-size:0.85rem;"><strong>Beginner</strong> — only undergraduate probability/statistics needed</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <div class="rc-level l2" style="min-width:1.6rem;height:1.6rem;font-size:0.7rem;">L2</div>
+            <span style="font-size:0.85rem;"><strong>Intermediate</strong> — solid GLM and linear algebra background</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <div class="rc-level l3" style="min-width:1.6rem;height:1.6rem;font-size:0.7rem;">L3</div>
+            <span style="font-size:0.85rem;"><strong>Advanced</strong> — graduate-level probability and inference</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <div class="rc-level l4" style="min-width:1.6rem;height:1.6rem;font-size:0.7rem;">L4</div>
+            <span style="font-size:0.85rem;"><strong>Research</strong> — original papers, active research areas</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Filter bar ────────────────────────────────────── -->
+      <div class="filter-bar" id="filter-bar">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="l1">Beginner</button>
+        <button class="filter-btn" data-filter="l2">Intermediate</button>
+        <button class="filter-btn" data-filter="l3">Advanced</button>
+        <button class="filter-btn" data-filter="l4">Research papers</button>
+        <button class="filter-btn" data-filter="selection">Model Selection</button>
+        <button class="filter-btn" data-filter="glm">GLMs</button>
+        <button class="filter-btn" data-filter="mixed">Mixed Models</button>
+        <button class="filter-btn" data-filter="nonlinear">Nonlinear</button>
+        <button class="filter-btn" data-filter="latent">Latent / EM</button>
+        <button class="filter-btn" data-filter="bayes">Bayesian</button>
+        <button class="filter-btn" data-filter="r">R / Software</button>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="path">Suggested Reading Paths</h2>
+
+      <p>
+        Before diving into individual entries, here are three structured reading paths
+        depending on your goal. Each path is self-contained — you do not need to follow
+        all three.
+      </p>
+
+      <h3 id="path-foundations">Path A — Building Solid Foundations (6–8 weeks)</h3>
+      <ul class="timeline">
+        <li>
+          <div class="tl-num">1</div>
+          <div class="tl-body">
+            <div class="tl-title">Faraway (2016) — <em>Extending the Linear Model with R</em></div>
+            <div class="tl-desc">Weeks 1–2. Establishes GLMs, binary regression, count models with worked R examples. Most accessible starting point.</div>
+          </div>
+        </li>
+        <li>
+          <div class="tl-num">2</div>
+          <div class="tl-body">
+            <div class="tl-title">McCullagh &amp; Nelder (1989) — <em>Generalised Linear Models</em>, Ch 1–5</div>
+            <div class="tl-desc">Weeks 3–4. The rigorous treatment of exponential families, IWLS, deviance, and model checking. Read alongside Faraway.</div>
+          </div>
+        </li>
+        <li>
+          <div class="tl-num">3</div>
+          <div class="tl-body">
+            <div class="tl-title">Burnham &amp; Anderson (2002) — <em>Model Selection and Multimodel Inference</em>, Ch 1–4</div>
+            <div class="tl-desc">Weeks 5–6. AIC philosophy, how to use it in practice, what consistency means, and why BIC differs.</div>
+          </div>
+        </li>
+        <li>
+          <div class="tl-num">4</div>
+          <div class="tl-body">
+            <div class="tl-title">Pinheiro &amp; Bates (2000) — <em>Mixed-Effects Models in S and S-PLUS</em>, Ch 1–3</div>
+            <div class="tl-desc">Weeks 7–8. Linear and nonlinear mixed models from first principles, with extensive R code.</div>
+          </div>
+        </li>
+      </ul>
+
+      <h3 id="path-theory">Path B — Rigorous Theory Track (graduate course)</h3>
+      <ul class="timeline">
+        <li>
+          <div class="tl-num">1</div>
+          <div class="tl-body">
+            <div class="tl-title">Akaike (1974) — original AIC paper</div>
+            <div class="tl-desc">Read first. Short (8 pages), foundational, illuminates the KL-divergence derivation.</div>
+          </div>
+        </li>
+        <li>
+          <div class="tl-num">2</div>
+          <div class="tl-body">
+            <div class="tl-title">Claeskens &amp; Hjort (2008) — <em>Model Selection and Model Averaging</em></div>
+            <div class="tl-desc">Full asymptotic theory, focused information criteria, model averaging. Read Ch 1–4 then dip into specific topics.</div>
+          </div>
+        </li>
+        <li>
+          <div class="tl-num">3</div>
+          <div class="tl-body">
+            <div class="tl-title">Dempster, Laird &amp; Rubin (1977) — original EM paper</div>
+            <div class="tl-desc">Read the full paper. The derivation, the monotone-ascent proof, and all the examples are in 37 pages.</div>
+          </div>
+        </li>
+        <li>
+          <div class="tl-num">4</div>
+          <div class="tl-body">
+            <div class="tl-title">McLachlan &amp; Krishnan (2007) — <em>The EM Algorithm and Extensions</em></div>
+            <div class="tl-desc">The complete theory of EM, convergence, ECM/ECME variants, and applications.</div>
+          </div>
+        </li>
+      </ul>
+
+      <h3 id="path-applied">Path C — Applied / Data Science Track</h3>
+      <ul class="timeline">
+        <li>
+          <div class="tl-num">1</div>
+          <div class="tl-body">
+            <div class="tl-title">Gelman et al. (2020) — <em>Regression and Other Stories</em></div>
+            <div class="tl-desc">The most readable modern treatment. Covers LM, GLM, multilevel models, causal inference — all with Stan/R examples.</div>
+          </div>
+        </li>
+        <li>
+          <div class="tl-num">2</div>
+          <div class="tl-body">
+            <div class="tl-title">Bates et al. (2015) — lme4 paper + package documentation</div>
+            <div class="tl-desc">Learn the computational details of lme4, its model syntax, and how to interpret output.</div>
+          </div>
+        </li>
+        <li>
+          <div class="tl-num">3</div>
+          <div class="tl-body">
+            <div class="tl-title">Davidian &amp; Giltinan (1995) — <em>Nonlinear Models for Repeated Measurement Data</em></div>
+            <div class="tl-desc">Focus on Ch 3–5 for NLME applications in pharmacokinetics and biology.</div>
+          </div>
+        </li>
+        <li>
+          <div class="tl-num">4</div>
+          <div class="tl-body">
+            <div class="tl-title">Fraley &amp; Raftery (2002) — mclust paper</div>
+            <div class="tl-desc">Practical guide to model-based clustering with mclust in R.</div>
+          </div>
+        </li>
+      </ul>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="foundations">Foundations — Probability &amp; Inference</h2>
+
+      <div class="reading-card" data-tags="l1 glm">
+        <div class="rc-header">
+          <div class="rc-level l1">L1</div>
+          <div>
+            <div class="rc-title">Extending the Linear Model with R</div>
+            <div class="rc-author">Julian J. Faraway &nbsp;·&nbsp; <span class="rc-year">2016 (2nd ed.), CRC Press</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential</span>
+          <span class="rc-tag applied">Applied</span>
+          <span class="rc-tag">GLMs</span>
+          <span class="rc-tag">Mixed models</span>
+          <span class="rc-tag">R code</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> A superb first-graduate-level text. Starts with binary response models
+            (logistic, probit), moves through count regression (Poisson, Negative Binomial, zero-inflated),
+            multinomial and ordinal responses, then linear mixed models, GLMMs, and survival analysis.
+            Every chapter has worked R examples with complete code.
+          </p>
+          <p><strong>Why read it:</strong> Faraway writes with exceptional clarity. Concepts are introduced through
+          real datasets before any general theory, making motivation natural. By the end of this book you will be
+          able to confidently fit and interpret any GLM or mixed model in R.</p>
+          <ul>
+            <li><strong>Chapter 1–3:</strong> Binary and binomial regression — logistic, probit, exact inference</li>
+            <li><strong>Chapter 4–5:</strong> Count data — Poisson, Negative Binomial, overdispersion</li>
+            <li><strong>Chapter 8:</strong> Linear mixed models with <code>lme4</code></li>
+            <li><strong>Chapter 9–10:</strong> GLMMs and GEE</li>
+          </ul>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> Start here if you are new to the material. The best bridge from undergraduate
+          statistics to the content of this course. Difficulty:
+          <span class="stars">★★☆☆☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l2 glm">
+        <div class="rc-header">
+          <div class="rc-level l2">L2</div>
+          <div>
+            <div class="rc-title">Generalised Linear Models (2nd ed.)</div>
+            <div class="rc-author">Peter McCullagh &amp; John A. Nelder &nbsp;·&nbsp; <span class="rc-year">1989, Chapman &amp; Hall</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential</span>
+          <span class="rc-tag theory">Theory</span>
+          <span class="rc-tag">Exponential family</span>
+          <span class="rc-tag">IWLS</span>
+          <span class="rc-tag">Deviance</span>
+          <span class="rc-tag">Canonical text</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The definitive mathematical treatment of GLMs. This book
+            defines the exponential family, derives IWLS, establishes the deviance as a goodness-of-fit
+            measure, and discusses model diagnostics at a depth unmatched elsewhere.
+          </p>
+          <p>
+            <strong>Why read it:</strong> If you want to truly understand <em>why</em> logistic regression
+            uses the logit link, why Poisson regression uses the log, and what "canonical link" means
+            mathematically, this is the source. The proof that IWLS is equivalent to Newton–Raphson on
+            the log-likelihood is here and nowhere else at this level of clarity.
+          </p>
+          <ul>
+            <li><strong>Chapter 2:</strong> The exponential family — the most important chapter</li>
+            <li><strong>Chapter 3:</strong> Estimation: IWLS, score equations, Fisher information</li>
+            <li><strong>Chapter 4:</strong> Inference: deviance, likelihood ratio tests, Wald tests</li>
+            <li><strong>Chapter 5:</strong> Binary data — the full treatment of logistic/probit regression</li>
+            <li><strong>Chapter 6:</strong> Multinomial and polytomous data</li>
+          </ul>
+          <p>
+            <strong>Key result to understand:</strong> The variance function $V(\mu) = b''(\theta)$ completely
+            characterises the random component of a GLM. The link function is separate from the variance function —
+            this is the central insight of the GLM framework.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> The canonical reference. Dense but precise. Read Chapters 2–4 before
+          any other serious GLM work. Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l2 glm">
+        <div class="rc-header">
+          <div class="rc-level l2">L2</div>
+          <div>
+            <div class="rc-title">An Introduction to Statistical Learning (2nd ed.)</div>
+            <div class="rc-author">James, Witten, Hastie &amp; Tibshirani &nbsp;·&nbsp; <span class="rc-year">2021, Springer (free PDF)</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag applied">Applied</span>
+          <span class="rc-tag">Cross-validation</span>
+          <span class="rc-tag">Model selection</span>
+          <span class="rc-tag">R code</span>
+          <span class="rc-tag">Free online</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> Linear and logistic regression, model selection, cross-validation,
+            regularisation (ridge, lasso), tree methods, SVM, and clustering. Available free at
+            <a href="https://www.statlearning.com" target="_blank">statlearning.com</a>.
+          </p>
+          <p>
+            <strong>Why read it:</strong> Chapter 5 (Resampling: CV and bootstrap) and Chapter 6
+            (Linear Model Selection and Regularisation) are outstanding companions to Chapter 1 of
+            these notes. The bias–variance tradeoff figures are among the clearest in the literature.
+          </p>
+          <ul>
+            <li><strong>Chapter 5:</strong> Cross-validation — LOO, k-fold, bootstrap (perfectly complements §1.5)</li>
+            <li><strong>Chapter 6:</strong> Subset selection, ridge, lasso — bridges to regularised model selection</li>
+          </ul>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> Very readable; best for CV and regularisation. Not a substitute for
+          rigorous theory but excellent for applied intuition. Difficulty: <span class="stars">★★☆☆☆</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="model-selection-books">Model Selection &amp; Information Criteria</h2>
+
+      <div class="reading-card" data-tags="l4 selection">
+        <div class="rc-header">
+          <div class="rc-level l4">L4</div>
+          <div>
+            <div class="rc-title">A new look at the statistical model identification</div>
+            <div class="rc-author">Hirotugu Akaike &nbsp;·&nbsp; <span class="rc-year">1974, IEEE Trans. Automatic Control 19(6): 716–723</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential paper</span>
+          <span class="rc-tag theory">Theory</span>
+          <span class="rc-tag">AIC origin</span>
+          <span class="rc-tag">KL divergence</span>
+          <span class="rc-tag">8 pages</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The original AIC paper. Akaike begins from information theory
+            (KL divergence between the true distribution $g$ and a parametric family $f_\theta$), notes that
+            maximum likelihood asymptotically minimises the KL divergence, then derives the bias correction
+            term that yields AIC. The entire argument fits in 8 pages.
+          </p>
+          <p>
+            <strong>Why read it:</strong> Understanding the original derivation is transformative. The key
+            insight — that maximised log-likelihood is an <em>upwardly biased</em> estimator of predictive
+            log-likelihood, with bias $\approx p$ — is simple once you see it, but took decades for the
+            field to absorb fully.
+          </p>
+          <p><strong>Core equation to understand:</strong></p>
+          <p style="text-align:center;font-style:italic;">
+            $E_g[\ell(\hat\theta;\mathbf{Y}^*)] \approx E_g[\ell(\hat\theta;\mathbf{Y})] - p$
+          </p>
+          <p>
+            where $\mathbf{Y}^*$ is new data. The AIC correction subtracts $p$ from the right-hand
+            side to estimate the left. The factor of 2 is for compatibility with chi-squared tables.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> Required reading. 8 pages, freely accessible, one of the most cited
+          papers in statistics. Read it at least twice. Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l4 selection">
+        <div class="rc-header">
+          <div class="rc-level l4">L4</div>
+          <div>
+            <div class="rc-title">Estimating the dimension of a model</div>
+            <div class="rc-author">Gideon Schwarz &nbsp;·&nbsp; <span class="rc-year">1978, Annals of Statistics 6(2): 461–464</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential paper</span>
+          <span class="rc-tag theory">Theory</span>
+          <span class="rc-tag">BIC origin</span>
+          <span class="rc-tag">Laplace approx</span>
+          <span class="rc-tag">4 pages</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The original BIC paper — remarkably just 4 pages. Schwarz derives
+            BIC from a Bayesian perspective: the $p\log n$ penalty arises from a Laplace approximation to the
+            log marginal likelihood $\log p(\mathbf{y}|\mathcal{M})$. The derivation is essentially Theorem 1.4
+            of these notes, carried out in two paragraphs.
+          </p>
+          <p>
+            <strong>Key insight:</strong> The $\log n$ factor comes from the fact that $|J_n| = O(n^p)$
+            (the observed information grows as $n^p$), so $\frac{1}{2}\log|J_n| = \frac{p}{2}\log n + O(1)$.
+            This is why BIC penalises complexity <em>more</em> as the sample size grows.
+          </p>
+          <p>
+            <strong>What it does NOT cover:</strong> BIC's finite-sample performance, how to choose between
+            AIC and BIC, or any application. For those, see Burnham &amp; Anderson (2002).
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> Read immediately after the AIC paper. Together they take under 30 minutes
+          and give you the complete foundational theory. Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l2 selection">
+        <div class="rc-header">
+          <div class="rc-level l2">L2</div>
+          <div>
+            <div class="rc-title">Model Selection and Multimodel Inference: A Practical Information-Theoretic Approach (2nd ed.)</div>
+            <div class="rc-author">Kenneth P. Burnham &amp; David R. Anderson &nbsp;·&nbsp; <span class="rc-year">2002, Springer</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential</span>
+          <span class="rc-tag applied">Applied</span>
+          <span class="rc-tag">AIC in practice</span>
+          <span class="rc-tag">Model averaging</span>
+          <span class="rc-tag">Ecology</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> A complete applied guide to AIC-based model selection. Covers
+            $\Delta$AIC, AIC weights, model averaging, evidence ratios, and $\mathrm{AIC}_c$. Includes
+            extensive examples from ecological research, but the principles are universal.
+          </p>
+          <p><strong>Key practical rules extracted from this book:</strong></p>
+          <ul>
+            <li>$\Delta\mathrm{AIC} < 2$: substantial support for this model</li>
+            <li>$\Delta\mathrm{AIC}$ between 4 and 7: considerably less support</li>
+            <li>$\Delta\mathrm{AIC} > 10$: essentially no support</li>
+            <li>AIC weights $w_i = \exp(-\Delta_i/2) / \sum_j \exp(-\Delta_j/2)$ — use for model averaging</li>
+          </ul>
+          <p>
+            <strong>Chapter 4</strong> on multimodel inference (model averaging and evidence synthesis)
+            is especially useful and goes beyond what most textbooks cover.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> The practitioner's bible for AIC. Opinionated (the authors are firmly
+          anti-null-hypothesis testing) but enormously useful. Read Ch 1–4 as a priority.
+          Difficulty: <span class="stars">★★☆☆☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l3 selection bayes">
+        <div class="rc-header">
+          <div class="rc-level l3">L3</div>
+          <div>
+            <div class="rc-title">Model Selection and Model Averaging</div>
+            <div class="rc-author">Gerda Claeskens &amp; Nils Lid Hjort &nbsp;·&nbsp; <span class="rc-year">2008, Cambridge University Press</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag theory">Theory</span>
+          <span class="rc-tag advanced">Advanced</span>
+          <span class="rc-tag">FIC</span>
+          <span class="rc-tag">Asymptotic theory</span>
+          <span class="rc-tag">Focused selection</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The most mathematically complete treatment of model selection.
+            Introduces the <strong>Focused Information Criterion (FIC)</strong> — the idea that the optimal
+            model depends on <em>what you want to estimate</em>, not just predictive accuracy.
+          </p>
+          <p>
+            <strong>Key insight — FIC:</strong> AIC and BIC are omnibus criteria — they score models
+            without regard to your specific inferential goal. FIC says: if you care about estimating
+            $\psi = g(\boldsymbol{\beta})$ (e.g., a specific quantile or odds ratio), minimise the
+            estimated MSE of $\hat\psi$ under each candidate model. Different quantities of interest
+            may lead to different optimal models.
+          </p>
+          <ul>
+            <li><strong>Chapter 2:</strong> Exact AIC and BIC derivations (the most precise treatment available)</li>
+            <li><strong>Chapter 3:</strong> The Akaike process and TIC under misspecification</li>
+            <li><strong>Chapter 5:</strong> Focused Information Criterion (FIC) — new concept not in these notes</li>
+            <li><strong>Chapter 7:</strong> Frequentist model averaging theory</li>
+          </ul>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> The graduate student's model selection reference. Read after Burnham &amp;
+          Anderson for depth. Essential for anyone doing PhD-level work on model uncertainty.
+          Difficulty: <span class="stars">★★★★☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l4 selection bayes">
+        <div class="rc-header">
+          <div class="rc-level l4">L4</div>
+          <div>
+            <div class="rc-title">Bayes Factors</div>
+            <div class="rc-author">Robert E. Kass &amp; Adrian E. Raftery &nbsp;·&nbsp; <span class="rc-year">1995, JASA 90(430): 773–795</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential paper</span>
+          <span class="rc-tag bayes">Bayesian</span>
+          <span class="rc-tag">Bayes factors</span>
+          <span class="rc-tag">BIC connection</span>
+          <span class="rc-tag">23 pages</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The definitive review of Bayes factors — what they are, how to
+            compute them (including the BIC approximation), the interpretive scale (the table in §1.6 of
+            these notes comes from here), and their relationship to $p$-values.
+          </p>
+          <p>
+            <strong>Key result:</strong> For large $n$, $2\log B_{10} \approx \mathrm{BIC}_0 - \mathrm{BIC}_1$,
+            connecting Bayesian model comparison directly to BIC differences.
+            This is the deepest reason BIC is Bayesian while AIC is frequentist.
+          </p>
+          <p>
+            <strong>The Lindley paradox</strong> (§1.6 of these notes) is explained clearly in §3.2 of this paper,
+            with a concrete numerical example that makes the paradox vivid.
+          </p>
+          <p>
+            <strong>Section 5 — Intrinsic Bayes Factors:</strong> A solution to the improper-prior problem
+            for Bayes factors, introduced here for the first time. Highly recommended.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> Read sections 1–4 carefully after studying §1.6 of these notes.
+          Transforms your understanding of what BIC actually means. Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="mixed-model-books">Mixed Models &amp; Longitudinal Data</h2>
+
+      <div class="reading-card" data-tags="l2 mixed r">
+        <div class="rc-header">
+          <div class="rc-level l2">L2</div>
+          <div>
+            <div class="rc-title">Mixed-Effects Models in S and S-PLUS</div>
+            <div class="rc-author">José C. Pinheiro &amp; Douglas M. Bates &nbsp;·&nbsp; <span class="rc-year">2000, Springer</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential</span>
+          <span class="rc-tag applied">Applied</span>
+          <span class="rc-tag">LMM</span>
+          <span class="rc-tag">NLME</span>
+          <span class="rc-tag">REML</span>
+          <span class="rc-tag">nlme package</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The companion book to the <code>nlme</code> R package.
+            Part I covers linear mixed models exhaustively: model specification, REML, BLUPs, diagnostics,
+            and correlation structures. Part II covers nonlinear mixed effects models with pharmacokinetic
+            examples. The Rat growth and Theophylline examples in these notes come directly from this book.
+          </p>
+          <p><strong>Particularly important sections:</strong></p>
+          <ul>
+            <li><strong>§2.2 — Model specification:</strong> How to formulate the $\mathbf{X}_i\boldsymbol{\beta} + \mathbf{Z}_i\mathbf{b}_i$ structure</li>
+            <li><strong>§2.4 — REML:</strong> Why REML reduces bias in variance component estimation (most careful treatment available)</li>
+            <li><strong>§2.5 — BLUPs:</strong> Full derivation of the BLUP formula and the Stein shrinkage interpretation</li>
+            <li><strong>§6 — Covariance structure:</strong> AR(1), compound symmetry, unstructured — when to use each</li>
+            <li><strong>§7 — NLME:</strong> Model building for pharmacokinetic data</li>
+          </ul>
+          <p>
+            <strong>Key formula highlighted:</strong> The BLUP $\hat{\mathbf{b}}_i = \boldsymbol{\Sigma}_b\mathbf{Z}_i^\top\boldsymbol{\Sigma}_i^{-1}(\mathbf{y}_i - \mathbf{X}_i\hat{\boldsymbol{\beta}})$
+            is derived from scratch with full motivation in Chapter 2.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> The most important single reference for Chapters 2–3 of these notes.
+          Read Part I before fitting any LMM in a research context. Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l2 mixed r">
+        <div class="rc-header">
+          <div class="rc-level l2">L2</div>
+          <div>
+            <div class="rc-title">Fitting Linear Mixed-Effects Models Using lme4</div>
+            <div class="rc-author">Douglas Bates, Martin Mächler, Ben Bolker &amp; Steve Walker &nbsp;·&nbsp; <span class="rc-year">2015, Journal of Statistical Software 67(1): 1–48</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential</span>
+          <span class="rc-tag applied">Applied</span>
+          <span class="rc-tag r">R / lme4</span>
+          <span class="rc-tag">Sparse matrices</span>
+          <span class="rc-tag">Free PDF</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The technical paper behind the <code>lme4</code> package —
+            the workhorse of mixed model fitting in R. Explains the Cholesky-based sparse matrix
+            representation, the profiled log-likelihood optimisation, how REML is implemented, and
+            how GLMMs are approximated via Laplace/AGQ.
+          </p>
+          <p><strong>What every practitioner must know from this paper:</strong></p>
+          <ul>
+            <li>Why <code>REML=TRUE</code> is the default and when to override it</li>
+            <li>How <code>nAGQ</code> controls quadrature accuracy (set to ≥ 10 for GLMMs)</li>
+            <li>Why <code>lmer</code> gives no $p$-values by default (the Satterthwaite/Kenward–Roger controversy)</li>
+            <li>How to read the <code>summary()</code> output — especially the correlation of fixed effects</li>
+          </ul>
+          <p>
+            <strong>Related resource:</strong> The lme4 vignette
+            <code>vignette("lmer", package="lme4")</code> is a gentler companion that demonstrates
+            the formula syntax with detailed examples.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> Required reading before using <code>lme4</code> in research.
+          Takes 2 hours; saves weeks of confusion. Freely available from JSS.
+          Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l4 mixed">
+        <div class="rc-header">
+          <div class="rc-level l4">L4</div>
+          <div>
+            <div class="rc-title">Random-Effects Models for Longitudinal Data</div>
+            <div class="rc-author">Nan M. Laird &amp; James H. Ware &nbsp;·&nbsp; <span class="rc-year">1982, Biometrics 38(4): 963–974</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Landmark paper</span>
+          <span class="rc-tag theory">Theory</span>
+          <span class="rc-tag">LMM origin</span>
+          <span class="rc-tag">REML</span>
+          <span class="rc-tag">EM for LMMs</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The paper that introduced the LMM as we know it today.
+            Defines the model, proposes both ML and REML estimation, uses the EM algorithm for
+            computation, and derives the BLUP equations.
+          </p>
+          <p>
+            <strong>Historical significance:</strong> Before this paper, random effects models existed
+            but had no general framework. Laird &amp; Ware unified balanced/unbalanced designs,
+            multiple random effects, and missing data under one model.
+          </p>
+          <p>
+            <strong>Key result:</strong> Under REML, the EM M-step for the variance components uses
+            both the BLUPs $\hat{\mathbf{b}}_i$ and their posterior covariance matrix
+            $\mathrm{Var}(\mathbf{b}_i|\mathbf{y}_i)$ — a subtlety often missed by practitioners
+            implementing EM for LMMs from scratch.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> Read after Pinheiro &amp; Bates for historical context and the
+          original EM derivation for LMMs. Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l4 mixed">
+        <div class="rc-header">
+          <div class="rc-level l4">L4</div>
+          <div>
+            <div class="rc-title">Approximate Inference in Generalized Linear Mixed Models</div>
+            <div class="rc-author">Norman E. Breslow &amp; David G. Clayton &nbsp;·&nbsp; <span class="rc-year">1993, JASA 88(421): 9–25</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential paper</span>
+          <span class="rc-tag theory">Theory</span>
+          <span class="rc-tag">GLMM</span>
+          <span class="rc-tag">Laplace approx</span>
+          <span class="rc-tag">PQL bias</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> Introduces PQL (Penalised Quasi-Likelihood) and the Laplace
+            approximation for GLMMs. Most importantly, demonstrates that PQL is <strong>biased</strong>
+            for binary data and count data with small denominators. The bias in variance components can
+            be severe — making this the definitive warning against PQL.
+          </p>
+          <p>
+            <strong>Key simulation result to remember:</strong> For a random-intercept logistic model
+            with $\sigma_b^2 = 1$ and average cluster size 5, PQL underestimates $\sigma_b^2$ by
+            roughly 30–40%. The Laplace approximation and GHQ with ≥ 10 nodes are much more accurate.
+          </p>
+          <p>
+            <strong>What this tells practitioners:</strong> Never use <code>glmer(..., nAGQ=0)</code>
+            (which triggers PQL) for binary responses. Always use at least <code>nAGQ=1</code>
+            (Laplace) and ideally <code>nAGQ=15</code> or higher for small clusters.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> Essential before trusting any GLMM output. Read the simulation
+          section carefully and memorise the rule: PQL is unreliable for binary GLMMs.
+          Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="em-books">The EM Algorithm &amp; Latent Variables</h2>
+
+      <div class="reading-card" data-tags="l4 latent">
+        <div class="rc-header">
+          <div class="rc-level l4">L4</div>
+          <div>
+            <div class="rc-title">Maximum Likelihood from Incomplete Data via the EM Algorithm</div>
+            <div class="rc-author">Arthur P. Dempster, Nan M. Laird &amp; Donald B. Rubin &nbsp;·&nbsp; <span class="rc-year">1977, JRSS-B 39(1): 1–38</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Landmark paper</span>
+          <span class="rc-tag theory">Theory</span>
+          <span class="rc-tag">EM origin</span>
+          <span class="rc-tag">Monotone ascent</span>
+          <span class="rc-tag">37 pages</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The original EM paper — one of the most cited papers in
+            the history of statistics (~50,000 citations). Defines the E-step and M-step, proves
+            that the observed-data log-likelihood is non-decreasing at every iteration, establishes
+            convergence conditions, and applies EM to a remarkable variety of problems:
+          </p>
+          <ul>
+            <li>ML from grouped, censored, and truncated data</li>
+            <li>Finite mixture models</li>
+            <li>Variance components in normal mixed models</li>
+            <li>Factor analysis</li>
+            <li>Hyperparameter estimation in empirical Bayes</li>
+          </ul>
+          <p>
+            <strong>Key proof:</strong> The monotone-ascent property (Theorem 4.1 of these notes) appears
+            in §2 of this paper. The crucial step — that $H(\theta;\theta') \leq H(\theta';\theta')$
+            by Jensen's inequality — is proved in one sentence and repays careful study.
+          </p>
+          <p>
+            <strong>Missing information principle:</strong> Section 4 derives $J = I_c - I_m$ and shows
+            that EM converges slowly when the fraction of missing information is high. This has practical
+            implications for when to prefer Newton–Raphson over EM.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> Read every word. This is one of those papers that rewards rereading
+          multiple times — each time you understand something you missed before.
+          Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l3 latent">
+        <div class="rc-header">
+          <div class="rc-level l3">L3</div>
+          <div>
+            <div class="rc-title">The EM Algorithm and Extensions (2nd ed.)</div>
+            <div class="rc-author">Geoffrey J. McLachlan &amp; Thriyambakam Krishnan &nbsp;·&nbsp; <span class="rc-year">2007, Wiley-Interscience</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential</span>
+          <span class="rc-tag theory">Theory</span>
+          <span class="rc-tag">EM convergence</span>
+          <span class="rc-tag">ECM / ECME</span>
+          <span class="rc-tag">MCEM</span>
+          <span class="rc-tag">Applications</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The definitive book on EM. Chapters 1–3 give the fullest
+            treatment of convergence theory available (global/local convergence, rate analysis,
+            missing information). Chapters 4–6 cover important extensions:
+          </p>
+          <ul>
+            <li><strong>ECM (Expectation–Conditional Maximisation):</strong> When the M-step has no closed form, replace it with multiple conditional maximisations</li>
+            <li><strong>ECME:</strong> ECM with maximisations over the observed-data likelihood (not Q), giving faster convergence</li>
+            <li><strong>MCEM (Monte Carlo EM):</strong> Replace the E-step expectation by a Monte Carlo average — essential when the conditional distribution has no closed form</li>
+            <li><strong>SEM (Supplemented EM):</strong> Computes the observed information matrix $J(\hat\theta)$ from EM iterates, bypassing numerical second derivatives</li>
+          </ul>
+          <p>
+            <strong>Chapter 4 on mixture models</strong> is the most complete treatment of Gaussian
+            mixture fitting, identifiability, and model selection for $K$ in one place.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> The comprehensive EM reference. Read Ch 1–3 for theory; dip into
+          later chapters by application. Difficulty: <span class="stars">★★★★☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l3 latent">
+        <div class="rc-header">
+          <div class="rc-level l3">L3</div>
+          <div>
+            <div class="rc-title">Finite Mixture Models</div>
+            <div class="rc-author">Geoffrey J. McLachlan &amp; David Peel &nbsp;·&nbsp; <span class="rc-year">2000, Wiley</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential</span>
+          <span class="rc-tag theory">Theory</span>
+          <span class="rc-tag">Identifiability</span>
+          <span class="rc-tag">Mixture of regressions</span>
+          <span class="rc-tag">HMM</span>
+          <span class="rc-tag">Model selection for K</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The standard reference on mixture models. Covers Gaussian,
+            Poisson, and binomial mixtures; mixtures of regressions; hidden Markov models; and
+            finite mixture discriminant analysis. Chapter 6 on selecting the number of components $K$
+            is especially important — it covers BIC, bootstrap LRT, ICL, and the limitations of each.
+          </p>
+          <p>
+            <strong>Non-regularity (Chapter 3):</strong> The most careful treatment of why standard
+            likelihood theory fails for mixtures. Key results:
+          </p>
+          <ul>
+            <li>The log-likelihood is unbounded for normal mixtures (degenerate solutions)</li>
+            <li>The LRT for testing $K=1$ vs $K=2$ is not asymptotically chi-squared — the usual regularity conditions fail</li>
+            <li>Bootstrap LRT is the reliable approach for testing $K$</li>
+          </ul>
+          <p>
+            <strong>Chapter 2 on EM for mixtures</strong> provides the complete algorithmic details,
+            including initialisation strategies and convergence diagnostics specific to the mixture problem.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> Read alongside the mclust paper (Fraley &amp; Raftery, 2002) for the
+          complete mixture model toolkit. Difficulty: <span class="stars">★★★★☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l4 latent">
+        <div class="rc-header">
+          <div class="rc-level l4">L4</div>
+          <div>
+            <div class="rc-title">Model-Based Clustering, Discriminant Analysis, and Density Estimation</div>
+            <div class="rc-author">Chris Fraley &amp; Adrian E. Raftery &nbsp;·&nbsp; <span class="rc-year">2002, JASA 97(458): 611–631</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag applied">Applied</span>
+          <span class="rc-tag r">R / mclust</span>
+          <span class="rc-tag">BIC for K</span>
+          <span class="rc-tag">Covariance structures</span>
+          <span class="rc-tag">Free PDF</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The methodology behind the <code>mclust</code> R package.
+            Gaussian mixture models with 14 covariance structures (spherical/diagonal/full × equal/unequal volume/shape/orientation). BIC is used to select both $K$ and the covariance structure simultaneously.
+          </p>
+          <p><strong>The 14 covariance models explained:</strong></p>
+          <ul>
+            <li><strong>EII:</strong> Spherical, equal volume — like K-means clustering</li>
+            <li><strong>VII:</strong> Spherical, varying volume — clusters of different sizes</li>
+            <li><strong>EEE:</strong> Ellipsoidal, equal volume/shape/orientation — clusters with same shape</li>
+            <li><strong>VVV:</strong> Fully unconstrained — most flexible, most parameters</li>
+          </ul>
+          <p>
+            <strong>Practical guidance from the paper:</strong> BIC consistently outperforms other criteria
+            (AIC, ICL) for selecting $K$ in the simulation studies presented. The authors recommend fitting
+            all 14 models for $K = 1, \ldots, 9$ and reporting the BIC-best solution.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> 20 pages that will make you an expert mclust user. Read before
+          any model-based clustering project. Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="bayes-books">Bayesian Inference</h2>
+
+      <div class="reading-card" data-tags="l2 bayes">
+        <div class="rc-header">
+          <div class="rc-level l2">L2</div>
+          <div>
+            <div class="rc-title">Bayesian Data Analysis (3rd ed.)</div>
+            <div class="rc-author">Andrew Gelman, John B. Carlin, Hal S. Stern, David B. Dunson, Aki Vehtari &amp; Donald B. Rubin &nbsp;·&nbsp; <span class="rc-year">2013, CRC Press (free PDF)</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential</span>
+          <span class="rc-tag bayes">Bayesian</span>
+          <span class="rc-tag">MCMC</span>
+          <span class="rc-tag">Hierarchical models</span>
+          <span class="rc-tag">Stan</span>
+          <span class="rc-tag">Free online</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The standard graduate-level Bayesian textbook.
+            Covers single-parameter and multiparameter models, hierarchical models, model checking
+            (posterior predictive checks), MCMC (Metropolis-Hastings, Gibbs, HMC), Stan, and
+            practical workflow. Freely available at <a href="http://www.stat.columbia.edu/~gelman/book/" target="_blank">stat.columbia.edu/~gelman/book</a>.
+          </p>
+          <p>
+            <strong>For these notes, focus on:</strong>
+          </p>
+          <ul>
+            <li><strong>Chapter 5 — Hierarchical models:</strong> The Bayesian treatment of what Chapter 2 calls LMMs. Includes the derivation of the BLUP as the posterior mean under a normal prior — connecting Bayesian and frequentist perspectives.</li>
+            <li><strong>Chapter 11 — Gibbs sampler:</strong> The algorithm used for Bayesian LMM inference (§2.4 of these notes). Full derivation from conditional conjugacy.</li>
+            <li><strong>Chapter 6 — Model checking:</strong> Posterior predictive checks as an alternative to information criteria for model adequacy.</li>
+          </ul>
+          <p>
+            <strong>Key insight about LMMs (Chapter 5):</strong> The BLUP $\hat b_i = \sigma_b^2/(\sigma_b^2 + \sigma^2/n_i) \cdot \bar e_i$ is exactly the posterior mean of $b_i$ under the normal prior
+            $b_i \sim N(0,\sigma_b^2)$ — a beautiful unification of Bayesian and frequentist mixed-model inference.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> If you read one Bayesian book, read this. The posterior predictive
+          check framework in Ch 6 is invaluable for model assessment. Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l1 bayes r">
+        <div class="rc-header">
+          <div class="rc-level l1">L1</div>
+          <div>
+            <div class="rc-title">Regression and Other Stories</div>
+            <div class="rc-author">Andrew Gelman, Jennifer Hill &amp; Aki Vehtari &nbsp;·&nbsp; <span class="rc-year">2020, Cambridge University Press</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag applied">Applied</span>
+          <span class="rc-tag">Multilevel models</span>
+          <span class="rc-tag">Causal inference</span>
+          <span class="rc-tag">R / Stan</span>
+          <span class="rc-tag">Highly readable</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> A ground-up treatment of regression from a modern, practical
+            perspective. Starts with linear regression and builds through GLMs, multilevel models (LMMs
+            from a Bayesian perspective), causal inference, and model evaluation.
+            Every concept is motivated by real social science or public health data.
+          </p>
+          <p>
+            <strong>Why it stands out:</strong> Exceptional emphasis on the <em>workflow</em> of applied
+            statistics — designing studies, checking assumptions, interpreting coefficients,
+            communicating uncertainty. The chapter on "Understanding regression models" (Ch 12)
+            is unlike anything in standard textbooks: it carefully distinguishes predictive,
+            descriptive, and causal interpretations of the same fitted model.
+          </p>
+          <ul>
+            <li><strong>Part 2 (Ch 9–12):</strong> Model building and checking — directly complements Chapter 1 of these notes</li>
+            <li><strong>Part 4 (Ch 17–22):</strong> Multilevel/hierarchical models — the applied perspective on Chapter 2</li>
+          </ul>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> The most readable modern statistics textbook available. Read in
+          parallel with the more theoretical entries. Difficulty: <span class="stars">★★☆☆☆</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="nonlinear-books">Nonlinear Models</h2>
+
+      <div class="reading-card" data-tags="l3 nonlinear">
+        <div class="rc-header">
+          <div class="rc-level l3">L3</div>
+          <div>
+            <div class="rc-title">Nonlinear Regression</div>
+            <div class="rc-author">George A. F. Seber &amp; C. J. Wild &nbsp;·&nbsp; <span class="rc-year">2003, Wiley-Interscience</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag essential">Essential</span>
+          <span class="rc-tag theory">Theory</span>
+          <span class="rc-tag">NLS theory</span>
+          <span class="rc-tag">Profile likelihood</span>
+          <span class="rc-tag">Intrinsic curvature</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> The definitive NLS textbook. Part I establishes the
+            mathematical theory: consistency and asymptotic normality of the NLS estimator, the
+            Gauss–Newton algorithm and its convergence, profile likelihood confidence regions,
+            and the Beale–Bates measures of nonlinearity.
+          </p>
+          <p>
+            <strong>Why profile likelihood intervals matter (Chapter 6):</strong> For highly nonlinear
+            models, the sampling distribution of $\hat\beta_k$ can be very non-Gaussian. Wald intervals
+            $(\hat\beta_k \pm 1.96\,\widehat{\mathrm{se}})$ can have terrible coverage. Profile likelihood
+            intervals are asymmetric, reflecting the true shape of the sampling distribution, and are
+            always preferred in nonlinear settings.
+          </p>
+          <p>
+            <strong>Intrinsic curvature (Chapter 7):</strong> Introduces geometric measures of how
+            "nonlinear" a model actually is. If the intrinsic curvature is small, linear approximations
+            (Wald inference, Gauss–Newton convergence) work well. If it is large, expect problems.
+          </p>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> The go-to reference when NLS goes wrong — slow convergence, wide
+          confidence intervals, or poor residuals. Difficulty: <span class="stars">★★★★☆</span>
+        </div>
+      </div>
+
+      <div class="reading-card" data-tags="l2 nonlinear r">
+        <div class="rc-header">
+          <div class="rc-level l2">L2</div>
+          <div>
+            <div class="rc-title">Nonlinear Models for Repeated Measurement Data</div>
+            <div class="rc-author">Marie Davidian &amp; David M. Giltinan &nbsp;·&nbsp; <span class="rc-year">1995, Chapman and Hall</span></div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag applied">Applied</span>
+          <span class="rc-tag">NLME</span>
+          <span class="rc-tag">Pharmacokinetics</span>
+          <span class="rc-tag">Biology</span>
+          <span class="rc-tag">Two-stage methods</span>
+        </div>
+        <div class="rc-body">
+          <p>
+            <strong>What it covers:</strong> A practitioner-oriented guide to NLME models, focusing on
+            pharmacokinetic and biological growth applications. Introduces two-stage methods
+            (fit each individual separately, then combine) as a conceptual gateway to the full NLME
+            model. Chapter 5 on the Theophylline dataset is the clearest exposition of pharmacokinetic
+            model building in the literature.
+          </p>
+          <p>
+            <strong>Two-stage method (Chapter 3):</strong> Stage 1 — fit NLS to each individual;
+            Stage 2 — treat individual estimates as data and model their distribution. Simple to
+            implement and gives excellent starting values for the full NLME.
+          </p>
+          <ul>
+            <li><strong>Chapter 5:</strong> Full pharmacokinetic analysis of Theophylline — the example in §3.3 of these notes</li>
+            <li><strong>Chapter 7:</strong> Assessing goodness of fit in NLME — population vs. individual residuals</li>
+          </ul>
+        </div>
+        <div class="rc-verdict">
+          <strong>Verdict:</strong> Best applied companion for Chapter 3. The Theophylline walkthrough
+          alone justifies the read. Difficulty: <span class="stars">★★★☆☆</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="online">Free Online Resources</h2>
+
+      <div class="reading-card" data-tags="l1 l2 r">
+        <div class="rc-header">
+          <div class="rc-level l1">L1</div>
+          <div>
+            <div class="rc-title">Introduction to Statistical Learning (2nd ed.)</div>
+            <div class="rc-author">James, Witten, Hastie &amp; Tibshirani &nbsp;·&nbsp;
+              <span class="rc-year">2021 — <a href="https://www.statlearning.com" target="_blank">statlearning.com</a> (free)</span>
+            </div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag applied">Applied</span><span class="rc-tag r">R code</span>
+          <span class="rc-tag">Free PDF</span><span class="rc-tag">Cross-validation</span>
+        </div>
+        <div class="rc-body">
+          <p>Free PDF, R code, and video lectures. Chapter 5 (resampling) and Chapter 6 (model selection)
+          are perfect complements to Chapter 1 of these notes. Also covers regularisation (lasso/ridge)
+          not included in these notes but important in practice.</p>
+        </div>
+        <div class="rc-verdict"><strong>Verdict:</strong> The most accessible entry point. Start here if uncertain. Difficulty: <span class="stars">★★☆☆☆</span></div>
+      </div>
+
+      <div class="reading-card" data-tags="l2 bayes r">
+        <div class="rc-header">
+          <div class="rc-level l2">L2</div>
+          <div>
+            <div class="rc-title">Bayesian Data Analysis (3rd ed.) — Free PDF</div>
+            <div class="rc-author">Gelman et al. &nbsp;·&nbsp;
+              <span class="rc-year"><a href="http://www.stat.columbia.edu/~gelman/book/" target="_blank">stat.columbia.edu/~gelman/book</a></span>
+            </div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag bayes">Bayesian</span><span class="rc-tag">Free PDF</span>
+          <span class="rc-tag">MCMC</span><span class="rc-tag">Stan</span>
+        </div>
+        <div class="rc-body">
+          <p>The full BDA3 PDF is freely available from the authors. Chapters 5 (hierarchical models),
+          11 (Gibbs sampler), and 12 (MCMC) are directly relevant to Chapters 2 and 4 of these notes.</p>
+        </div>
+        <div class="rc-verdict"><strong>Verdict:</strong> Download immediately. Difficulty: <span class="stars">★★★☆☆</span></div>
+      </div>
+
+      <div class="reading-card" data-tags="l2 r mixed">
+        <div class="rc-header">
+          <div class="rc-level l2">L2</div>
+          <div>
+            <div class="rc-title">lme4: Mixed-Effects Models in R — CRAN vignettes</div>
+            <div class="rc-author">Douglas Bates &nbsp;·&nbsp;
+              <span class="rc-year"><code>vignette("lmer", package="lme4")</code></span>
+            </div>
+          </div>
+        </div>
+        <div class="rc-meta">
+          <span class="rc-tag r">R / lme4</span><span class="rc-tag applied">Applied</span><span class="rc-tag">Free</span>
+        </div>
+        <div class="rc-body">
+          <p>The built-in lme4 vignettes are among the best software documentation in statistics.
+          Run <code>vignette("lmer", package="lme4")</code> in R for the main tutorial and
+          <code>vignette("pbuilder", package="lme4")</code> for parametric bootstrap CIs.</p>
+        </div>
+        <div class="rc-verdict"><strong>Verdict:</strong> Free, authoritative, always up-to-date. Difficulty: <span class="stars">★★☆☆☆</span></div>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="css/nav.js"></script>
+<script>
+  /* Filter logic */
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const f = btn.dataset.filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.reading-card').forEach(card => {
+        if (f === 'all' || card.dataset.tags.split(' ').includes(f)) {
+          card.style.display = '';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter 1: Model Selection — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams',
+             macros: { btheta: '\\boldsymbol{\\theta}', bbeta: '\\boldsymbol{\\beta}',
+                       bmu: '\\boldsymbol{\\mu}', bSigma: '\\boldsymbol{\\Sigma}',
+                       bx: '\\mathbf{x}', by: '\\mathbf{y}', bX: '\\mathbf{X}',
+                       bY: '\\mathbf{Y}', bI: '\\mathbf{I}', bH: '\\mathbf{H}',
+                       E: '\\mathbb{E}', P: '\\mathbb{P}', R: '\\mathbb{R}' }
+           },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="model-selection">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Chapter 1</span>
+        <span class="chapter-tag">Model Selection</span>
+        <span class="chapter-tag">AIC · BIC · Cross-Validation · Bayes Factors</span>
+      </div>
+
+      <h1 class="page-title">Model Selection</h1>
+      <p class="page-subtitle">Choosing among competing models using information criteria, cross-validation, and Bayesian approaches</p>
+
+      <blockquote>
+        "All models are wrong; the practical question is how wrong do they have to be to not be useful."
+        <cite>— George E. P. Box (1979)</cite>
+      </blockquote>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="intro">1.1 Introduction and Motivation</h2>
+
+      <p>
+        A <strong>statistical model</strong> is a family of probability distributions
+        $\mathcal{F} = \{f(\cdot\,;\boldsymbol{\theta}) : \boldsymbol{\theta} \in \Theta\}$
+        indexed by parameters $\boldsymbol{\theta}$. We use the model to describe observed data
+        $\mathbf{y} = (y_1, \ldots, y_n)$. In practice, we almost never know the
+        <em>true</em> data-generating distribution $g$; instead we choose from a list of
+        candidate families $\mathcal{F}^{(1)}, \mathcal{F}^{(2)}, \ldots$
+      </p>
+
+      <p>
+        <strong>Model selection</strong> is the process of choosing which candidate best balances
+        fidelity to the data against parsimony. The challenge is that adding parameters to a model
+        <em>always</em> improves in-sample fit — but at the cost of overfitting, poor generalisation,
+        and interpretability. The combinatorial explosion is staggering: with only $p = 20$ binary
+        covariates in a logistic regression there are $2^{20} > 10^6$ possible models.
+      </p>
+
+      <p>Four guiding criteria help us navigate this space:</p>
+
+      <ol>
+        <li><strong>Substantive knowledge</strong> — prior scientific understanding should constrain the candidate set.</li>
+        <li><strong>Robustness</strong> — selected models should be stable under mild misspecification.</li>
+        <li><strong>Goodness of fit</strong> — residual analysis and formal tests diagnose model failure.</li>
+        <li><strong>Parsimony</strong> — among equally adequate models, prefer the simpler one.</li>
+      </ol>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="kl">1.2 The Kullback–Leibler Divergence</h2>
+
+      <p>
+        To formalise "closeness" between a candidate model and reality, we need a measure of
+        discrepancy between two probability distributions. The most natural such measure in
+        statistics is the <strong>Kullback–Leibler (KL) divergence</strong>.
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 1.1 — Kullback–Leibler Divergence</div>
+        <p>
+          Let $g$ and $f(\cdot\,;\boldsymbol{\theta})$ be two probability density (or mass) functions.
+          The <strong>Kullback–Leibler divergence</strong> from $f(\cdot\,;\boldsymbol{\theta})$ to $g$ is
+        </p>
+        $$\mathrm{KL}(g \Vert f_{\boldsymbol{\theta}}) = \int g(y) \log \frac{g(y)}{f(y;\boldsymbol{\theta})} \, dy$$
+        <p>
+          (replace the integral by a sum for discrete distributions).
+        </p>
+      </div>
+
+      <h3 id="kl-properties">Properties of the KL Divergence</h3>
+
+      <p>
+        The KL divergence has several properties that make it ideal for model comparison. Let us
+        derive them from scratch.
+      </p>
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 1.1 — Non-negativity (Gibbs' Inequality)</div>
+        <p>For any two distributions $g$ and $f_{\boldsymbol{\theta}}$,</p>
+        $$\mathrm{KL}(g \Vert f_{\boldsymbol{\theta}}) \geq 0$$
+        <p>with equality if and only if $g(y) = f(y;\boldsymbol{\theta})$ for (almost) all $y$.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof of Theorem 1.1</summary>
+        <div class="proof-body">
+          <p>
+            We use <strong>Jensen's inequality</strong>: for a concave function $\phi$,
+            $\mathbb{E}[\phi(Z)] \leq \phi(\mathbb{E}[Z])$.
+            Since $\log$ is concave:
+          </p>
+          $$\mathrm{KL}(g \Vert f_{\boldsymbol{\theta}}) = \mathbb{E}_g\!\left[\log \frac{g(Y)}{f(Y;\boldsymbol{\theta})}\right] = -\mathbb{E}_g\!\left[\log \frac{f(Y;\boldsymbol{\theta})}{g(Y)}\right]$$
+          $$\geq -\log \mathbb{E}_g\!\left[\frac{f(Y;\boldsymbol{\theta})}{g(Y)}\right] = -\log \int g(y) \cdot \frac{f(y;\boldsymbol{\theta})}{g(y)} \, dy = -\log 1 = 0.$$
+          <p>
+            Equality in Jensen's inequality holds iff the argument of $\log$ is constant a.s., i.e.
+            $f(y;\boldsymbol{\theta})/g(y) = c$ for a.e. $y$. Integrating both sides shows $c=1$,
+            so $g = f_{\boldsymbol{\theta}}$ a.e.
+          </p>
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <p>
+        Two further properties are worth noting:
+      </p>
+      <ul>
+        <li>$\mathrm{KL}(g \Vert f_{\boldsymbol{\theta}}) \neq \mathrm{KL}(f_{\boldsymbol{\theta}} \Vert g)$ in general — the KL divergence is <em>not</em> symmetric, so it is not a metric.</li>
+        <li>It can be decomposed as:
+          $$\mathrm{KL}(g \Vert f_{\boldsymbol{\theta}}) = \underbrace{\int g(y) \log g(y) \, dy}_{\text{entropy of }g\text{ (constant in }\boldsymbol{\theta}\text{)}} - \underbrace{\int g(y) \log f(y;\boldsymbol{\theta}) \, dy}_{\text{cross-entropy}}$$
+        </li>
+      </ul>
+
+      <div class="callout note">
+        <div class="callout-title">💡 Key insight for model selection</div>
+        <p>
+          Because the entropy of $g$ does not depend on $\boldsymbol{\theta}$,
+          <em>minimising $\mathrm{KL}(g \Vert f_{\boldsymbol{\theta}})$ over $\boldsymbol{\theta}$
+          is equivalent to maximising the expected log-likelihood</em>
+          $\mathbb{E}_g[\log f(Y;\boldsymbol{\theta})]$.
+          This is exactly what maximum likelihood estimation does asymptotically.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="misspec">1.3 Likelihood Inference Under Misspecification</h2>
+
+      <p>
+        Suppose the true distribution is $g$ but we fit a parametric model
+        $\{f(\cdot\,;\boldsymbol{\theta}) : \boldsymbol{\theta} \in \Theta\}$
+        that does <em>not</em> contain $g$. What does the MLE converge to, and what
+        is its asymptotic distribution?
+      </p>
+
+      <h3 id="pseudo-true">The Pseudo-True Parameter</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 1.2 — Pseudo-True Parameter</div>
+        <p>
+          The <strong>pseudo-true parameter</strong> $\boldsymbol{\theta}_g$ is the value of
+          $\boldsymbol{\theta}$ that minimises the KL divergence between $g$ and $f(\cdot;\boldsymbol{\theta})$:
+        </p>
+        $$\boldsymbol{\theta}_g = \arg\min_{\boldsymbol{\theta} \in \Theta} \mathrm{KL}(g \Vert f_{\boldsymbol{\theta}}) = \arg\max_{\boldsymbol{\theta} \in \Theta} \mathbb{E}_g[\log f(Y;\boldsymbol{\theta})]$$
+      </div>
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 1.2 — Asymptotic Behaviour of MLE Under Misspecification</div>
+        <p>
+          Let $Y_1, \ldots, Y_n \overset{\mathrm{i.i.d.}}{\sim} g$. Under regularity conditions,
+          the MLE $\hat{\boldsymbol{\theta}}_n = \arg\max_{\boldsymbol{\theta}} \ell(\boldsymbol{\theta})$ satisfies:
+        </p>
+        <p><strong>(i) Consistency:</strong></p>
+        $$\hat{\boldsymbol{\theta}}_n \overset{p}{\to} \boldsymbol{\theta}_g \quad \text{as } n \to \infty$$
+        <p><strong>(ii) Asymptotic normality:</strong></p>
+        $$\sqrt{n}(\hat{\boldsymbol{\theta}}_n - \boldsymbol{\theta}_g) \overset{d}{\to} \mathrm{N}\!\left(\mathbf{0},\, \mathcal{I}(\boldsymbol{\theta}_g)^{-1} K(\boldsymbol{\theta}_g) \mathcal{I}(\boldsymbol{\theta}_g)^{-1}\right)$$
+        <p>where</p>
+        $$\mathcal{I}(\boldsymbol{\theta}) = -\mathbb{E}_g\!\left[\frac{\partial^2 \log f(Y;\boldsymbol{\theta})}{\partial\boldsymbol{\theta}\partial\boldsymbol{\theta}^\top}\right], \qquad K(\boldsymbol{\theta}) = \mathbb{E}_g\!\left[\frac{\partial \log f(Y;\boldsymbol{\theta})}{\partial\boldsymbol{\theta}} \cdot \frac{\partial \log f(Y;\boldsymbol{\theta})}{\partial\boldsymbol{\theta}^\top}\right]$$
+        <p>are the <em>expected information</em> and <em>outer-product-of-scores</em> matrices, respectively.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof sketch of Theorem 1.2</summary>
+        <div class="proof-body">
+          <p><strong>Part (i): Consistency.</strong></p>
+          <p>
+            The log-likelihood is $\ell(\boldsymbol{\theta}) = \sum_{i=1}^n \log f(y_i;\boldsymbol{\theta})$.
+            By the strong law of large numbers,
+          </p>
+          $$\frac{1}{n}\ell(\boldsymbol{\theta}) = \frac{1}{n}\sum_{i=1}^n \log f(y_i;\boldsymbol{\theta}) \overset{a.s.}{\to} \mathbb{E}_g[\log f(Y;\boldsymbol{\theta})]$$
+          <p>
+            uniformly in $\boldsymbol{\theta}$ (under compactness and dominated convergence conditions).
+            Since $\mathbb{E}_g[\log f(Y;\boldsymbol{\theta})]$ is uniquely maximised at $\boldsymbol{\theta}_g$,
+            the argmax converges in probability to $\boldsymbol{\theta}_g$.
+          </p>
+
+          <p><strong>Part (ii): Asymptotic normality.</strong></p>
+          <p>
+            Taylor-expand the score $s(\boldsymbol{\theta}) = \partial\ell/\partial\boldsymbol{\theta}$
+            around $\boldsymbol{\theta}_g$:
+          </p>
+          $$\mathbf{0} = s(\hat{\boldsymbol{\theta}}_n) \approx s(\boldsymbol{\theta}_g) + \frac{\partial s(\boldsymbol{\theta}_g)}{\partial\boldsymbol{\theta}^\top}(\hat{\boldsymbol{\theta}}_n - \boldsymbol{\theta}_g)$$
+          <p>Rearranging:</p>
+          $$\sqrt{n}(\hat{\boldsymbol{\theta}}_n - \boldsymbol{\theta}_g) \approx \left[-\frac{1}{n}\frac{\partial^2\ell(\boldsymbol{\theta}_g)}{\partial\boldsymbol{\theta}\partial\boldsymbol{\theta}^\top}\right]^{-1} \frac{1}{\sqrt{n}} s(\boldsymbol{\theta}_g)$$
+          <p>
+            By LLN, $-\frac{1}{n}\partial^2\ell/\partial\boldsymbol{\theta}^2 \overset{p}{\to} \mathcal{I}(\boldsymbol{\theta}_g)$.
+            By CLT (score terms have mean $0$ under $g$, since $\boldsymbol{\theta}_g$ maximises $\mathbb{E}_g[\ell]$):
+          </p>
+          $$\frac{1}{\sqrt{n}} s(\boldsymbol{\theta}_g) \overset{d}{\to} \mathrm{N}(\mathbf{0}, K(\boldsymbol{\theta}_g))$$
+          <p>Slutsky's theorem combines these two limits to give the sandwich covariance.</p>
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <h3 id="sandwich">The Sandwich Variance Estimator</h3>
+      <p>
+        When $g \neq f_{\boldsymbol{\theta}}$, the asymptotic covariance of $\sqrt{n}(\hat{\boldsymbol{\theta}} - \boldsymbol{\theta}_g)$
+        has the <strong>sandwich form</strong>:
+      </p>
+      $$\mathbf{V}(\boldsymbol{\theta}_g) = \mathcal{I}(\boldsymbol{\theta}_g)^{-1} K(\boldsymbol{\theta}_g) \mathcal{I}(\boldsymbol{\theta}_g)^{-1}$$
+      <p>
+        Note that when the model is correctly specified ($g = f_{\boldsymbol{\theta}_g}$), the
+        <em>information equality</em> holds: $K(\boldsymbol{\theta}_g) = \mathcal{I}(\boldsymbol{\theta}_g)$,
+        so $\mathbf{V} = \mathcal{I}^{-1}$, the familiar Fisher information inverse.
+        Under misspecification these two matrices differ, and ignoring this leads to
+        <em>over-confident inference</em>.
+      </p>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 1.1 — When does misspecification matter most?</div>
+        <p>
+          Consider fitting a Poisson model $Y \sim \mathrm{Poisson}(\mu)$ when the true distribution
+          is Negative Binomial with mean $\mu$ and overdispersion parameter $\phi > 0$.
+          Here $K(\boldsymbol{\theta}_g) = \phi \, \mathcal{I}(\boldsymbol{\theta}_g)$, so the sandwich
+          variance is $\phi$ times larger than the naïve Poisson variance. Confidence intervals
+          based on $\mathcal{I}^{-1}$ alone are therefore too narrow by a factor $\sqrt{\phi}$.
+          This is exactly the <em>overdispersion</em> problem addressed in Chapter 2.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="ic">1.4 Information Criteria</h2>
+
+      <p>
+        We want to compare two candidate models, say model $\mathcal{M}_1$ and $\mathcal{M}_2$.
+        A natural approach: pick the model with the smaller KL divergence to the truth.
+        But we do not know $g$! We need to estimate $\mathrm{KL}(g \Vert f_{\hat{\boldsymbol{\theta}}})$
+        from data.
+      </p>
+
+      <h3 id="aic-derivation">Deriving AIC from First Principles</h3>
+
+      <p>
+        The <strong>expected log-likelihood at the MLE</strong> is a natural measure of model
+        quality. Define:
+        $$\Delta(\boldsymbol{\theta}) = \mathbb{E}_{Y^*}\!\left[\log f(Y^*;\boldsymbol{\theta})\right]$$
+        where $Y^*$ is a new, independent observation from $g$. The best possible value is achieved
+        at $\boldsymbol{\theta}_g$:
+        $$\Delta_* = \Delta(\boldsymbol{\theta}_g) = \mathbb{E}_{Y^*}[\log f(Y^*;\boldsymbol{\theta}_g)]$$
+      </p>
+
+      <p>
+        We would like to estimate $\Delta(\hat{\boldsymbol{\theta}})$, but $\hat{\boldsymbol{\theta}}$
+        was estimated from the same data, introducing optimistic bias. Specifically:
+      </p>
+      $$\frac{1}{n}\ell(\hat{\boldsymbol{\theta}}) = \frac{1}{n}\sum_{i=1}^n \log f(y_i;\hat{\boldsymbol{\theta}}) \approx \Delta(\hat{\boldsymbol{\theta}}) + \underbrace{\text{bias}}_{\text{overfit term}}$$
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 1.3 — AIC Bias Correction</div>
+        <p>Under regularity conditions, as $n \to \infty$:</p>
+        $$\mathbb{E}\!\left[\frac{1}{n}\ell(\hat{\boldsymbol{\theta}}) - \Delta(\hat{\boldsymbol{\theta}})\right] \approx \frac{p}{n}$$
+        <p>where $p = \dim(\boldsymbol{\theta})$. Therefore, an approximately unbiased estimator of $\Delta(\hat{\boldsymbol{\theta}})$ is</p>
+        $$\widehat{\Delta} = \frac{1}{n}\ell(\hat{\boldsymbol{\theta}}) - \frac{p}{n}$$
+        <p>or, in the scaled form used by Akaike (1974):</p>
+        $$\mathrm{AIC} = 2p - 2\ell(\hat{\boldsymbol{\theta}})$$
+        <p><em>Lower AIC = better model.</em></p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Full derivation of the AIC bias term</summary>
+        <div class="proof-body">
+          <p>
+            Let $\mathbf{y} = (y_1, \ldots, y_n)$ be the training data and $\mathbf{y}^* = (y_1^*, \ldots, y_n^*)$
+            be an independent test set of the same size, both from $g$. Define:
+          </p>
+          $$T_1 = \frac{1}{n}\ell(\hat{\boldsymbol{\theta}};\mathbf{y}) = \frac{1}{n}\sum_{i=1}^n \log f(y_i;\hat{\boldsymbol{\theta}})$$
+          $$T_2 = \frac{1}{n}\ell(\hat{\boldsymbol{\theta}};\mathbf{y}^*) = \frac{1}{n}\sum_{i=1}^n \log f(y_i^*;\hat{\boldsymbol{\theta}})$$
+          <p>
+            $T_2$ is the <strong>out-of-sample</strong> log-likelihood; its expectation over
+            both $\mathbf{y}$ and $\mathbf{y}^*$ is $\Delta(\hat{\boldsymbol{\theta}})$. The bias is:
+          </p>
+          $$b = \mathbb{E}[T_1 - T_2]$$
+          <p>
+            Taylor-expand $T_1$ and $T_2$ around $\boldsymbol{\theta}_g$.
+            Let $\delta = \hat{\boldsymbol{\theta}} - \boldsymbol{\theta}_g$.
+            Then:
+          </p>
+          $$T_1 - T_2 \approx \frac{1}{n}[\ell(\boldsymbol{\theta}_g;\mathbf{y}) - \ell(\boldsymbol{\theta}_g;\mathbf{y}^*)] + \frac{1}{n}[s(\boldsymbol{\theta}_g;\mathbf{y}) - s(\boldsymbol{\theta}_g;\mathbf{y}^*)]^\top \delta$$
+          <p>
+            Taking expectations, the first term vanishes (same distribution). The second term gives:
+          </p>
+          $$b \approx \mathbb{E}\!\left[\frac{1}{n} s(\boldsymbol{\theta}_g;\mathbf{y})^\top \delta\right]$$
+          <p>
+            Using the first-order condition $s(\hat{\boldsymbol{\theta}}) = 0$ and expanding:
+          </p>
+          $$s(\boldsymbol{\theta}_g) \approx -J(\boldsymbol{\theta}_g)(\hat{\boldsymbol{\theta}} - \boldsymbol{\theta}_g) = -J \delta, \quad \text{so } \delta \approx -J^{-1} s(\boldsymbol{\theta}_g)$$
+          <p>
+            where $J = J(\boldsymbol{\theta}_g)$ is the observed information (a $p \times p$ matrix).
+            Therefore:
+          </p>
+          $$b \approx \mathbb{E}\!\left[\frac{1}{n} s(\boldsymbol{\theta}_g)^\top (-J^{-1}) s(\boldsymbol{\theta}_g) \cdot \frac{1}{n} \cdot n\right]$$
+          $$= \frac{1}{n}\mathbb{E}\!\left[\mathrm{tr}(J^{-1} s(\boldsymbol{\theta}_g) s(\boldsymbol{\theta}_g)^\top)\right]$$
+          $$= \frac{1}{n} \mathrm{tr}\!\left(J^{-1} \mathbb{E}[s(\boldsymbol{\theta}_g) s(\boldsymbol{\theta}_g)^\top]\right) = \frac{1}{n} \mathrm{tr}(J^{-1} \cdot n K) = \mathrm{tr}(J^{-1} K)$$
+          <p>
+            Under the correctly specified model $K = \mathcal{I} \approx J/n$, so:
+          </p>
+          $$b \approx \mathrm{tr}(\mathcal{I}^{-1} \mathcal{I}) \cdot \frac{1}{n} \cdot n = \frac{p}{n}$$
+          <p>
+            Multiplying by $n$ and rearranging gives the AIC correction $+2p$.
+          </p>
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <h3 id="aicc">Small-Sample Correction: AIC<sub>c</sub></h3>
+
+      <p>
+        The derivation above is asymptotic. For small $n$ relative to $p$, the bias can be
+        substantially larger than $p/n$. For normally distributed regression models,
+        the exact correction gives:
+      </p>
+      $$\mathrm{AIC}_c = \mathrm{AIC} + \frac{2p(p+1)}{n - p - 1} = 2p - 2\ell(\hat{\boldsymbol{\theta}}) + \frac{2p(p+1)}{n-p-1}$$
+      <p>
+        As $n \to \infty$ the extra term vanishes and $\mathrm{AIC}_c \to \mathrm{AIC}$.
+        It is good practice to always use $\mathrm{AIC}_c$ unless $n/p$ is large (say $> 40$).
+      </p>
+
+      <h3 id="bic-derivation">Deriving BIC from First Principles</h3>
+
+      <p>
+        The <strong>Bayesian Information Criterion (BIC)</strong>, introduced by Schwarz (1978),
+        arises from a very different motivation: approximating the <em>marginal likelihood</em>
+        (also called the model evidence) that appears in Bayesian model comparison.
+      </p>
+
+      <p>
+        Given a model $\mathcal{M}$ with parameters $\boldsymbol{\theta}$ and a prior
+        $\pi(\boldsymbol{\theta})$, the marginal likelihood is:
+        $$p(\mathbf{y} \mid \mathcal{M}) = \int f(\mathbf{y};\boldsymbol{\theta}) \pi(\boldsymbol{\theta}) \, d\boldsymbol{\theta}$$
+      </p>
+
+      <p>
+        Approximating this integral by Laplace's method (second-order Taylor expansion of the
+        log-integrand around the MLE $\hat{\boldsymbol{\theta}}$):
+      </p>
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 1.4 — Laplace Approximation → BIC</div>
+        <p>
+          Under regularity conditions and for large $n$:
+        </p>
+        $$\log p(\mathbf{y} \mid \mathcal{M}) \approx \ell(\hat{\boldsymbol{\theta}}) - \frac{p}{2}\log n + \mathrm{const}$$
+        <p>Equivalently, defining (to be <em>minimised</em>):</p>
+        $$\mathrm{BIC} = p\log n - 2\ell(\hat{\boldsymbol{\theta}})$$
+        <p>
+          Lower BIC corresponds to a higher (approximate) marginal likelihood, and hence a
+          more plausible model under the Bayesian framework.
+        </p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Derivation of BIC via Laplace approximation</summary>
+        <div class="proof-body">
+          <p>Write the marginal likelihood as:</p>
+          $$p(\mathbf{y} \mid \mathcal{M}) = \int \exp\!\left[\ell(\boldsymbol{\theta}) + \log\pi(\boldsymbol{\theta})\right] d\boldsymbol{\theta}$$
+          <p>
+            Define $h(\boldsymbol{\theta}) = \ell(\boldsymbol{\theta}) + \log\pi(\boldsymbol{\theta})$.
+            Taylor-expand around $\hat{\boldsymbol{\theta}}$:
+          </p>
+          $$h(\boldsymbol{\theta}) \approx h(\hat{\boldsymbol{\theta}}) - \frac{1}{2}(\boldsymbol{\theta}-\hat{\boldsymbol{\theta}})^\top J_n(\hat{\boldsymbol{\theta}})(\boldsymbol{\theta}-\hat{\boldsymbol{\theta}})$$
+          <p>where $J_n = -\partial^2\ell/\partial\boldsymbol{\theta}^2$ is the observed information (the prior derivative is negligible for large $n$). Substituting back:</p>
+          $$p(\mathbf{y} \mid \mathcal{M}) \approx e^{h(\hat{\boldsymbol{\theta}})} \int \exp\!\left[-\tfrac{1}{2}(\boldsymbol{\theta}-\hat{\boldsymbol{\theta}})^\top J_n (\boldsymbol{\theta}-\hat{\boldsymbol{\theta}})\right] d\boldsymbol{\theta}$$
+          $$= e^{h(\hat{\boldsymbol{\theta}})} \cdot (2\pi)^{p/2} |J_n|^{-1/2}$$
+          <p>Taking logs:</p>
+          $$\log p(\mathbf{y}\mid\mathcal{M}) \approx \ell(\hat{\boldsymbol{\theta}}) + \log\pi(\hat{\boldsymbol{\theta}}) + \frac{p}{2}\log(2\pi) - \frac{1}{2}\log|J_n|$$
+          <p>
+            Since $J_n = n \hat{\mathcal{I}}(\hat{\boldsymbol{\theta}})$ where $\hat{\mathcal{I}}$ is
+            $O(1)$, we have $\log|J_n| = p\log n + \log|\hat{\mathcal{I}}|$.
+            Dropping terms that are $O(\log n)$ or smaller (including the prior term, which does not grow with $n$):
+          </p>
+          $$\log p(\mathbf{y}\mid\mathcal{M}) = \ell(\hat{\boldsymbol{\theta}}) - \frac{p}{2}\log n + O(1)$$
+          <p>Multiplying by $-2$ and dropping $O(1)$ terms:</p>
+          $$\mathrm{BIC} = p\log n - 2\ell(\hat{\boldsymbol{\theta}})$$
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <h3 id="tic">Takeuchi Information Criterion (TIC)</h3>
+
+      <p>
+        Recall from the bias derivation that the true correction under misspecification is
+        $\mathrm{tr}(J^{-1} K)$ rather than $p$. The <strong>TIC</strong> (Takeuchi, 1976) uses
+        this more general correction:
+      </p>
+      $$\mathrm{TIC} = 2\,\mathrm{tr}(\hat{J}^{-1}\hat{K}) - 2\ell(\hat{\boldsymbol{\theta}})$$
+      <p>
+        where $\hat{J} = -\sum_i \partial^2 \log f(y_i;\hat{\boldsymbol{\theta}})/\partial\boldsymbol{\theta}^2$
+        and $\hat{K} = \sum_i [\partial \log f(y_i;\hat{\boldsymbol{\theta}})/\partial\boldsymbol{\theta}]
+        [\partial \log f(y_i;\hat{\boldsymbol{\theta}})/\partial\boldsymbol{\theta}]^\top$.
+        Under correct specification, $\mathrm{TIC} \approx \mathrm{AIC}$.
+        TIC requires more computation but is valid under misspecification.
+      </p>
+
+      <h3 id="ic-comparison">Comparing AIC and BIC</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>AIC</th>
+              <th>BIC</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Penalty per parameter</td>
+              <td>$2$</td>
+              <td>$\log n$ (grows with $n$)</td>
+            </tr>
+            <tr>
+              <td>Motivation</td>
+              <td>Predictive accuracy (KL divergence)</td>
+              <td>Bayesian model evidence (Laplace)</td>
+            </tr>
+            <tr>
+              <td>Asymptotic goal</td>
+              <td><em>Asymptotically efficient</em>: selects the best predictor</td>
+              <td><em>Consistent</em>: selects the true model (if it's in the set)</td>
+            </tr>
+            <tr>
+              <td>Overfitting tendency</td>
+              <td>Slightly higher (selects larger models)</td>
+              <td>Lower (penalises complexity more at large $n$)</td>
+            </tr>
+            <tr>
+              <td>Best when</td>
+              <td>True model is complex / not in candidate set</td>
+              <td>True model is parsimonious and in candidate set</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">🔍 AIC vs BIC — when $n$ is large</div>
+        <p>
+          The BIC penalty $\log n$ exceeds the AIC penalty of $2$ once $n > e^2 \approx 7.4$.
+          For $n = 1000$, $\log(1000) \approx 6.9$, so BIC penalises an extra parameter
+          <em>three times more heavily</em> than AIC. AIC never achieves consistency; it selects
+          the overfitted model with probability approximately $0.157$ (not zero) even as
+          $n \to \infty$ when the true model is in the candidate set.
+        </p>
+      </div>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 1.2 — Nodal Involvement in Prostate Cancer</div>
+        <p>
+          A dataset on $n = 53$ prostate cancer patients records whether cancer has spread to
+          pelvic lymph nodes (<code>nodes</code>) as a binary response. Five binary covariates are
+          available:
+        </p>
+        <ul>
+          <li><code>acid</code>: serum acid phosphatase is high</li>
+          <li><code>stage</code>: advanced clinical stage</li>
+          <li><code>grade</code>: severe X-ray finding</li>
+          <li><code>age</code>: patient age ≥ 60</li>
+          <li><code>xray</code>: X-ray finding</li>
+        </ul>
+        <p>
+          There are $2^5 = 32$ possible logistic regression models. We fit all 32 and compare
+          AIC and BIC.
+        </p>
+        <div class="code-label">R</div>
+        <pre><code class="language-r">library(MASS)
+data(nodal)
+
+# Build all 2^5 = 32 subsets of {acid, stage, grade, age, xray}
+covariates <- c("acid", "stage", "grade", "age", "xray")
+fits <- vector("list", 2^5)
+
+for (k in 0:(2^5 - 1)) {
+  vars <- covariates[as.logical(intToBits(k)[1:5])]
+  formula <- if (length(vars) == 0) {
+    r ~ 1
+  } else {
+    as.formula(paste("r ~", paste(vars, collapse = " + ")))
+  }
+  fits[[k + 1]] <- glm(formula, data = nodal, family = binomial)
+}
+
+aic_vals <- sapply(fits, AIC)
+bic_vals <- sapply(fits, BIC)
+
+# Best models
+best_aic <- fits[[which.min(aic_vals)]]
+best_bic <- fits[[which.min(bic_vals)]]
+
+cat("Best AIC model:", deparse(formula(best_aic)), "\n")
+cat("Best BIC model:", deparse(formula(best_bic)), "\n")</code></pre>
+        <p>
+          Both AIC and BIC select the four-parameter model with covariates
+          <code>acid</code>, <code>stage</code>, and <code>xray</code> (plus intercept).
+          This makes biological sense: serum acid phosphatase, clinical stage, and X-ray findings
+          are the three strongest predictors of nodal involvement.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="variable-selection">1.5 Variable Selection in Linear Models</h2>
+
+      <p>
+        For linear models $\mathbf{Y} = \mathbf{X}\boldsymbol{\beta} + \boldsymbol{\varepsilon}$
+        with $\boldsymbol{\varepsilon} \sim \mathrm{N}(\mathbf{0}, \sigma^2 \mathbf{I})$, we can
+        analyse model selection criteria in closed form and explicitly derive the
+        <strong>bias–variance tradeoff</strong>.
+      </p>
+
+      <h3 id="prediction-error">Prediction Error Decomposition</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 1.3 — Prediction Error</div>
+        <p>
+          For a fitted model with predicted values $\hat{\mathbf{Y}} = \mathbf{H}\mathbf{Y}$
+          (where $\mathbf{H}$ is the hat matrix), the <strong>prediction error</strong> for a
+          new observation at the same design points is:
+        </p>
+        $$\Delta = \frac{1}{n}\sum_{i=1}^n \mathbb{E}\!\left[(Y_i^* - \hat{Y}_i)^2\right]$$
+        <p>where $Y_i^* \sim g$ is independent of the training data.</p>
+      </div>
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 1.5 — Bias–Variance Decomposition</div>
+        <p>Let $\boldsymbol{\mu}^* = \mathbb{E}_g[\mathbf{Y}]$ be the true mean vector. Denote by $p$ the number of parameters in the fitted model. Then:</p>
+        $$\Delta = \underbrace{\frac{1}{n}\|\boldsymbol{\mu}^* - \mathbf{H}\boldsymbol{\mu}^*\|^2}_{\text{Bias}^2} + \underbrace{\frac{p}{n}\sigma^2}_{\text{Variance}} + \sigma^2$$
+        <p>
+          The three components are: (1) bias from an incomplete model, (2) variance from
+          estimating $p$ parameters, (3) irreducible noise.
+        </p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof of Theorem 1.5</summary>
+        <div class="proof-body">
+          <p>
+            Write the error at point $i$ as:
+          </p>
+          $$Y_i^* - \hat{Y}_i = (Y_i^* - \mu_i^*) + (\mu_i^* - [\mathbf{H}\boldsymbol{\mu}^*]_i) + ([\mathbf{H}\boldsymbol{\mu}^*]_i - \hat{Y}_i)$$
+          <p>
+            Since $Y_i^*$ is independent of $\hat{Y}_i$, cross-terms vanish when squaring and taking expectations. Summing over $i$:
+          </p>
+          $$n\Delta = \mathbb{E}\|\mathbf{Y}^* - \hat{\mathbf{Y}}\|^2 = \underbrace{\mathbb{E}\|\mathbf{Y}^* - \boldsymbol{\mu}^*\|^2}_{n\sigma^2} + \|\boldsymbol{\mu}^* - \mathbf{H}\boldsymbol{\mu}^*\|^2 + \mathbb{E}\|\mathbf{H}\boldsymbol{\mu}^* - \hat{\mathbf{Y}}\|^2$$
+          <p>
+            For the last term: $\hat{\mathbf{Y}} = \mathbf{H}\mathbf{Y}$, so
+            $\mathbf{H}\boldsymbol{\mu}^* - \hat{\mathbf{Y}} = -\mathbf{H}(\mathbf{Y} - \boldsymbol{\mu}^*)$. Therefore:
+          </p>
+          $$\mathbb{E}\|\mathbf{H}(\mathbf{Y} - \boldsymbol{\mu}^*)\|^2 = \sigma^2 \mathrm{tr}(\mathbf{H}^\top\mathbf{H}) = \sigma^2 \mathrm{tr}(\mathbf{H}) = p\sigma^2$$
+          <p>
+            (using $\mathbf{H}^2 = \mathbf{H}$ and $\mathrm{tr}(\mathbf{H}) = p$ for the projection onto a $p$-dimensional subspace).
+          </p>
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <p>
+        This theorem formalises the <strong>bias–variance tradeoff</strong>:
+      </p>
+      <ul>
+        <li>
+          <strong>Underfitting</strong> (too few parameters): the bias term
+          $\|\boldsymbol{\mu}^* - \mathbf{H}\boldsymbol{\mu}^*\|^2 / n$ is large.
+        </li>
+        <li>
+          <strong>Overfitting</strong> (too many parameters): the variance term $p\sigma^2/n$ grows.
+        </li>
+        <li>
+          <strong>The true model</strong>: bias $= 0$, variance $= p_0 \sigma^2/n$, so $\Delta_* = (1 + p_0/n)\sigma^2$.
+        </li>
+      </ul>
+
+      <h3 id="mallows">Mallow's $C_p$</h3>
+
+      <p>
+        Mallow's $C_p$ is an estimator of $n\Delta / \sigma^2 - n$, i.e., the scaled prediction
+        error minus the irreducible component:
+        $$C_p = \frac{\mathrm{RSS}_p}{\hat{\sigma}^2} - n + 2p$$
+        where $\mathrm{RSS}_p$ is the residual sum of squares from the $p$-parameter model and
+        $\hat{\sigma}^2$ is estimated from the full model.
+        A model is "good" if $C_p \approx p$ (bias is negligible).
+        Note that $C_p$ is equivalent to AIC for normally distributed errors.
+      </p>
+
+      <h3 id="cross-validation">Cross-Validation</h3>
+
+      <p>
+        <strong>Cross-validation (CV)</strong> estimates prediction error directly by
+        evaluating the model on data not used in fitting. This bypasses the need for
+        asymptotic approximations.
+      </p>
+
+      <h4 id="loo">Leave-One-Out CV (LOO-CV)</h4>
+
+      <p>
+        Remove observation $i$, refit the model, predict $y_i$. The LOO-CV error is:
+        $$\mathrm{CV}_{\mathrm{LOO}} = \frac{1}{n}\sum_{i=1}^n (y_i - \hat{y}_{-i})^2$$
+        where $\hat{y}_{-i}$ is the prediction for $y_i$ from the model fitted without $y_i$.
+      </p>
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 1.6 — LOO Shortcut for Linear Models</div>
+        <p>
+          For a linear model with hat matrix $\mathbf{H}$, LOO-CV can be computed
+          <em>without refitting</em> $n$ times:
+        </p>
+        $$\mathrm{CV}_{\mathrm{LOO}} = \frac{1}{n}\sum_{i=1}^n \left(\frac{y_i - \hat{y}_i}{1 - h_{ii}}\right)^2$$
+        <p>where $h_{ii} = [\mathbf{H}]_{ii}$ is the $i$-th diagonal element of the hat matrix.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof of the LOO shortcut</summary>
+        <div class="proof-body">
+          <p>
+            For the model fitted without observation $i$, denote the OLS estimator by
+            $\hat{\boldsymbol{\beta}}_{-i}$. The key identity is:
+          </p>
+          $$y_i - \hat{y}_{-i} = \frac{y_i - \hat{y}_i}{1 - h_{ii}}$$
+          <p>
+            <strong>Proof of identity:</strong> From the Sherman–Morrison–Woodbury formula,
+            removing row $i$ of $\mathbf{X}$ changes the hat matrix by a rank-1 update. A direct
+            calculation gives:
+          </p>
+          $$\hat{\boldsymbol{\beta}}_{-i} = \hat{\boldsymbol{\beta}} - (\mathbf{X}^\top\mathbf{X})^{-1}\mathbf{x}_i \frac{y_i - \hat{y}_i}{1 - h_{ii}}$$
+          <p>
+            The prediction at $\mathbf{x}_i$ from this model is:
+          </p>
+          $$\hat{y}_{-i} = \mathbf{x}_i^\top \hat{\boldsymbol{\beta}}_{-i} = \hat{y}_i - h_{ii} \frac{y_i - \hat{y}_i}{1 - h_{ii}} = y_i - \frac{y_i - \hat{y}_i}{1 - h_{ii}}$$
+          <p>
+            Therefore $y_i - \hat{y}_{-i} = (y_i - \hat{y}_i)/(1 - h_{ii})$, as claimed.
+          </p>
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <h4 id="gcv">Generalised CV (GCV)</h4>
+      <p>
+        GCV replaces the individual leverages $h_{ii}$ by their average $\bar{h} = p/n$:
+        $$\mathrm{GCV} = \frac{1}{n}\sum_{i=1}^n \left(\frac{y_i - \hat{y}_i}{1 - p/n}\right)^2 = \frac{\mathrm{RSS}/n}{(1 - p/n)^2}$$
+        GCV is computationally simpler and numerically more stable than LOO-CV for large $n$.
+      </p>
+
+      <h4 id="kfold">$k$-Fold CV</h4>
+      <p>
+        Partition the data into $k$ roughly equal folds $\mathcal{D}_1, \ldots, \mathcal{D}_k$.
+        For each fold $j$: fit the model on $\mathcal{D} \setminus \mathcal{D}_j$, predict on
+        $\mathcal{D}_j$. Aggregate errors:
+        $$\mathrm{CV}_k = \frac{1}{n}\sum_{j=1}^k \sum_{i \in \mathcal{D}_j}(y_i - \hat{y}_{-j,i})^2$$
+        Typical choices: $k = 5$ or $k = 10$. $k = n$ gives LOO-CV.
+      </p>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 1.3 — Polynomial Regression: Bias–Variance in Action</div>
+        <p>
+          Generate $n = 50$ observations from $Y_i = \sin(x_i) + \varepsilon_i$,
+          $\varepsilon_i \sim \mathrm{N}(0, 0.25)$, $x_i \in [-\pi, \pi]$.
+          Fit polynomial models of degrees $d = 1, 2, \ldots, 15$.
+        </p>
+        <div class="code-label">R</div>
+        <pre><code class="language-r">set.seed(42)
+n <- 50
+x <- seq(-pi, pi, length.out = n)
+y <- sin(x) + rnorm(n, sd = 0.5)
+
+# Fit polynomials of degree 1 to 15
+d_max <- 15
+aic_v <- bic_v <- cv_v <- numeric(d_max)
+
+for (d in 1:d_max) {
+  fit <- lm(y ~ poly(x, d, raw = TRUE))
+  aic_v[d] <- AIC(fit)
+  bic_v[d] <- BIC(fit)
+
+  # LOO-CV using the hat matrix shortcut
+  H <- hat(model.matrix(fit))
+  res <- residuals(fit)
+  cv_v[d] <- mean((res / (1 - diag(H)))^2)
+}
+
+# Which degree is selected?
+cat("AIC selects degree:", which.min(aic_v), "\n")
+cat("BIC selects degree:", which.min(bic_v), "\n")
+cat("LOO-CV selects degree:", which.min(cv_v), "\n")
+
+# Plot
+plot(1:d_max, cv_v, type = "b", col = "steelblue", pch = 16,
+     xlab = "Polynomial Degree", ylab = "CV / AIC / BIC (scaled)",
+     main = "Bias-Variance Tradeoff in Polynomial Regression")
+lines(1:d_max, (aic_v - min(aic_v)) / diff(range(aic_v)) * diff(range(cv_v)) + min(cv_v),
+      col = "tomato", type = "b", pch = 17)
+legend("topright", c("LOO-CV", "AIC (scaled)"), col = c("steelblue", "tomato"), pch = c(16,17))</code></pre>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="bayesian-ms">1.6 A Bayesian Perspective on Model Selection</h2>
+
+      <p>
+        The Bayesian approach to model selection is conceptually elegant: assign prior
+        probabilities to models, update them using the data, and use the resulting posterior
+        probabilities to compare models or average over them.
+      </p>
+
+      <h3 id="posterior-model-prob">Posterior Model Probabilities</h3>
+
+      <p>
+        Suppose we have $M$ candidate models $\mathcal{M}_1, \ldots, \mathcal{M}_M$, each with
+        prior probability $P(\mathcal{M}_m)$ and parameters $\boldsymbol{\theta}_m$ with prior
+        $\pi(\boldsymbol{\theta}_m \mid \mathcal{M}_m)$. After observing $\mathbf{y}$, the
+        posterior probability of model $m$ is:
+      </p>
+      $$P(\mathcal{M}_m \mid \mathbf{y}) = \frac{P(\mathbf{y} \mid \mathcal{M}_m) P(\mathcal{M}_m)}{\sum_{k=1}^M P(\mathbf{y} \mid \mathcal{M}_k) P(\mathcal{M}_k)}$$
+      <p>where the <strong>marginal likelihood</strong> is:</p>
+      $$P(\mathbf{y} \mid \mathcal{M}_m) = \int f(\mathbf{y};\boldsymbol{\theta}_m, \mathcal{M}_m) \pi(\boldsymbol{\theta}_m \mid \mathcal{M}_m) \, d\boldsymbol{\theta}_m$$
+
+      <h3 id="bayes-factors">Bayes Factors</h3>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 1.4 — Bayes Factor</div>
+        <p>The <strong>Bayes factor</strong> in favour of model $\mathcal{M}_1$ over $\mathcal{M}_2$ is:</p>
+        $$B_{12} = \frac{P(\mathbf{y} \mid \mathcal{M}_1)}{P(\mathbf{y} \mid \mathcal{M}_2)}$$
+        <p>It satisfies:</p>
+        $$\underbrace{\frac{P(\mathcal{M}_1 \mid \mathbf{y})}{P(\mathcal{M}_2 \mid \mathbf{y})}}_{\text{Posterior odds}} = B_{12} \times \underbrace{\frac{P(\mathcal{M}_1)}{P(\mathcal{M}_2)}}_{\text{Prior odds}}$$
+      </div>
+
+      <p>
+        Kass and Raftery (1995) give the following interpretive scale for $2\log B_{12}$
+        (on the same scale as AIC/BIC differences):
+      </p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>$2\log B_{12}$</th><th>Evidence against $\mathcal{M}_2$</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>$0 - 2$</td><td>Not worth more than a bare mention</td></tr>
+            <tr><td>$2 - 6$</td><td>Positive</td></tr>
+            <tr><td>$6 - 10$</td><td>Strong</td></tr>
+            <tr><td>$> 10$</td><td>Very strong</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="lindley">Lindley's Paradox — The Sensitivity of Bayes Factors to Priors</h3>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 1.4 — Lindley's Paradox</div>
+        <p>
+          Consider testing $H_0: \theta = 0$ vs $H_1: \theta \neq 0$ for a normal mean,
+          with $y \mid \theta \sim \mathrm{N}(\theta, 1)$ and a diffuse prior
+          $\theta \sim \mathrm{N}(0, \tau^2)$ under $H_1$. The Bayes factor is:
+        </p>
+        $$B_{10} = \left(1 + \tau^2\right)^{1/2} \exp\!\left(-\frac{y^2 \tau^2}{2(1 + \tau^2)}\right)$$
+        <p>
+          As $\tau^2 \to \infty$ (increasingly vague prior), $B_{10} \to 0$ regardless of the
+          data. That is, a <em>vaguer</em> prior <em>always</em> supports $H_0$ more, even if
+          the data strongly favours $H_1$.
+        </p>
+        <p>
+          <strong>Lesson:</strong> Bayes factors are extremely sensitive to the prior
+          specification under $H_1$. Always use proper, meaningful priors; never use improper
+          (infinite-variance) priors for model comparison.
+        </p>
+      </div>
+
+      <h3 id="model-averaging">Bayesian Model Averaging (BMA)</h3>
+
+      <p>
+        Instead of selecting a single model, BMA accounts for <strong>model uncertainty</strong>
+        by averaging predictions across all candidate models, weighted by their posterior
+        probabilities.
+      </p>
+
+      <p>
+        For a quantity of interest $\Delta$ (e.g., a future observation or a regression coefficient):
+      </p>
+      $$P(\Delta \mid \mathbf{y}) = \sum_{m=1}^M P(\Delta \mid \mathbf{y}, \mathcal{M}_m) P(\mathcal{M}_m \mid \mathbf{y})$$
+
+      <p>This gives:</p>
+      $$\mathbb{E}[\Delta \mid \mathbf{y}] = \sum_{m=1}^M \mathbb{E}[\Delta \mid \mathbf{y}, \mathcal{M}_m] P(\mathcal{M}_m \mid \mathbf{y})$$
+      $$\mathrm{Var}(\Delta \mid \mathbf{y}) = \sum_{m=1}^M P(\mathcal{M}_m \mid \mathbf{y}) \left\{\mathrm{Var}(\Delta\mid\mathbf{y},\mathcal{M}_m) + \left[\mathbb{E}(\Delta\mid\mathbf{y},\mathcal{M}_m) - \mathbb{E}(\Delta\mid\mathbf{y})\right]^2\right\}$$
+
+      <div class="callout note">
+        <div class="callout-title">💡 BMA in practice</div>
+        <p>
+          BMA tends to give better-calibrated predictions than single-model inference,
+          especially when the true model is genuinely uncertain. The <code>BMA</code> and
+          <code>BMS</code> packages in R implement BMA for linear and generalised linear models.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="summary">Chapter Summary</h2>
+
+      <div class="key-points">
+        <h4>Key Points from Chapter 1</h4>
+        <ul>
+          <li>
+            The KL divergence $\mathrm{KL}(g \Vert f_\theta) \geq 0$ measures model–truth discrepancy;
+            minimising it is equivalent to maximising the expected log-likelihood.
+          </li>
+          <li>
+            The MLE converges to the <em>pseudo-true</em> parameter $\boldsymbol{\theta}_g$ under
+            misspecification, with a sandwich covariance matrix $\mathcal{I}^{-1} K \mathcal{I}^{-1}$.
+          </li>
+          <li>
+            <strong>AIC</strong> $= 2p - 2\hat{\ell}$ estimates prediction error; it is
+            asymptotically efficient but not consistent.
+          </li>
+          <li>
+            <strong>BIC</strong> $= p\log n - 2\hat{\ell}$ approximates the log marginal likelihood;
+            it is consistent but may underfit.
+          </li>
+          <li>
+            The bias–variance decomposition $\Delta = \text{bias}^2 + \sigma^2 p/n + \sigma^2$
+            explains why adding parameters always improves in-sample fit but eventually hurts
+            out-of-sample prediction.
+          </li>
+          <li>
+            LOO-CV can be computed in one pass using the hat matrix shortcut $(e_i / (1 - h_{ii}))^2$.
+          </li>
+          <li>
+            Bayesian model comparison uses Bayes factors and posterior model probabilities;
+            results are sensitive to the prior under $H_1$ (Lindley's paradox).
+          </li>
+        </ul>
+      </div>
+
+      <div class="chapter-nav">
+        <a href="index.html">
+          <span class="nav-label">← Previous</span>
+          <span class="nav-title">Introduction</span>
+        </a>
+        <a href="beyond-glms.html" class="next">
+          <span class="nav-label">Next Chapter →</span>
+          <span class="nav-title">2 — Beyond Generalised Linear Models</span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+</body>
+</html>

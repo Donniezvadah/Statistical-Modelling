@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 1: AIC &amp; BIC in Practice — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams' },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="lab1">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Lab 1</span>
+        <span class="chapter-tag">AIC &amp; BIC in Practice</span>
+        <span class="chapter-tag">Simulation Study · Prediction Error</span>
+      </div>
+
+      <h1 class="page-title">Lab 1 — AIC &amp; BIC in Practice</h1>
+      <p class="page-subtitle">A simulation study exploring when each criterion works, when it fails, and why</p>
+
+      <div class="callout note">
+        <div class="callout-title">📋 Lab Overview</div>
+        <ul>
+          <li><strong>Topic:</strong> Model selection criteria — AIC, BIC, and cross-validation</li>
+          <li><strong>Method:</strong> Monte Carlo simulation with Poisson regression</li>
+          <li><strong>Skills:</strong> Writing simulation functions, comparing criteria, estimating prediction error</li>
+          <li><strong>Solutions:</strong> Provided below each question — try the exercise first!</li>
+        </ul>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="background">Background</h2>
+
+      <p>
+        In Chapter 1 we derived AIC and BIC theoretically. Now we put them to the test
+        in a controlled simulation where we <em>know</em> the truth. This lets us directly
+        measure how often each criterion selects the correct model, how they behave as
+        $n$ changes, and what happens when the true model is absent from the candidate set.
+      </p>
+
+      <h3 id="setup">Simulation Setup</h3>
+
+      <p>
+        We generate responses $Y_{im} \sim \mathrm{Poisson}(\mu^*(x_{im}))$ for
+        $i = 1, \ldots, n$ (observations) and $m = 1, \ldots, M$ (independent
+        replicates of the whole experiment). The true mean function is:
+      </p>
+      $$\mu^*(x) = 8 \exp(w(x)), \quad x_i = -10 + \frac{20(i-1)}{n-1}$$
+
+      <p>
+        We fit Poisson regression models with polynomial predictors of degrees
+        $p = 1, 2, \ldots, p_{\max}$, and record which polynomial degree is selected
+        by AIC and BIC in each replicate.
+      </p>
+
+      <h3 id="starter-code">Starter Code</h3>
+
+      <p>
+        Here is the base simulation framework. Study it carefully before attempting
+        the exercises.
+      </p>
+
+      <div class="code-label">R — Starter code</div>
+      <pre><code class="language-r"># ── Parameters ──────────────────────────────────────────────────
+n     <- 200   # observations per replicate
+M     <- 3     # independent replicates
+p_max <- 20    # maximum polynomial degree to consider
+B     <- 100   # Monte Carlo repetitions
+
+# ── True mean function ───────────────────────────────────────────
+w <- function(x) 0.001 * (100 + x + x^2 + x^3)   # cubic polynomial
+mu_true <- function(x) 8 * exp(w(x))
+
+# ── Fixed design points ──────────────────────────────────────────
+x <- -10 + 20 * (seq_len(n) - 1) / (n - 1)
+
+# ── Storage matrices (rows = B reps, cols = p_max models) ────────
+aic_mat <- matrix(NA_real_, nrow = B, ncol = p_max)
+bic_mat <- matrix(NA_real_, nrow = B, ncol = p_max)
+
+# ── Main simulation loop ─────────────────────────────────────────
+set.seed(42)
+for (b in seq_len(B)) {
+  # Generate M replicates, pool into one dataset
+  y_all <- replicate(M, rpois(n, mu_true(x)))
+  x_all <- rep(x, M)
+  y_vec <- as.vector(y_all)
+
+  for (p in seq_len(p_max)) {
+    fit <- glm(y_vec ~ poly(x_all, p),
+               family = poisson(link = "log"))
+    aic_mat[b, p] <- AIC(fit)
+    bic_mat[b, p] <- BIC(fit)
+  }
+}
+
+# ── Selection frequencies ────────────────────────────────────────
+aic_selected <- apply(aic_mat, 1, which.min)
+bic_selected <- apply(bic_mat, 1, which.min)
+
+cat("AIC selection frequency:\n"); print(table(aic_selected))
+cat("\nBIC selection frequency:\n"); print(table(bic_selected))</code></pre>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="q1">Exercise 1 — Effect of Sample Size</h2>
+
+      <div class="callout example">
+        <div class="callout-title">📝 Exercise 1</div>
+        <p>
+          Wrap the simulation above into a reusable function
+          <code>run_sim(n, M, w_fn, p_max, B, seed)</code>.
+          Use it to investigate how AIC and BIC perform as a model selection criterion for
+          $n \in \{25, 50, 100, 200, 1000\}$, keeping $M = 3$, $p_{\max} = 20$, $B = 200$.
+        </p>
+        <p>For each $n$, report:</p>
+        <ol>
+          <li>The proportion of replicates in which each criterion selects the true polynomial degree ($p^* = 3$ for the cubic $w$).</li>
+          <li>The mean selected degree and its standard deviation.</li>
+          <li>A boxplot of selected degrees across replicates.</li>
+        </ol>
+        <p>
+          <strong>Interpret:</strong> Which criterion is more consistent? Does BIC become
+          more accurate as $n$ grows? What does this tell you about consistency?
+        </p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Solution to Exercise 1</summary>
+        <div class="proof-body">
+
+          <div class="code-label">R — Solution</div>
+          <pre><code class="language-r"># ── Reusable simulation function ─────────────────────────────────
+run_sim <- function(n, M = 3, w_fn, p_max = 20, B = 200, seed = 1) {
+  set.seed(seed)
+  x <- -10 + 20 * (seq_len(n) - 1) / (n - 1)
+  mu_fn <- function(x) 8 * exp(w_fn(x))
+
+  aic_sel <- integer(B)
+  bic_sel <- integer(B)
+
+  for (b in seq_len(B)) {
+    y_vec <- as.vector(replicate(M, rpois(n, mu_fn(x))))
+    x_all <- rep(x, M)
+
+    aic_v <- bic_v <- numeric(p_max)
+    for (p in seq_len(p_max)) {
+      fit <- glm(y_vec ~ poly(x_all, p), family = poisson)
+      aic_v[p] <- AIC(fit)
+      bic_v[p] <- BIC(fit)
+    }
+    aic_sel[b] <- which.min(aic_v)
+    bic_sel[b] <- which.min(bic_v)
+  }
+
+  list(aic = aic_sel, bic = bic_sel, n = n)
+}
+
+# ── Run for all sample sizes ─────────────────────────────────────
+w_cubic <- function(x) 0.001 * (100 + x + x^2 + x^3)
+n_vals  <- c(25, 50, 100, 200, 1000)
+results <- lapply(n_vals, run_sim, w_fn = w_cubic, B = 200)
+
+# ── Summary table ────────────────────────────────────────────────
+p_star <- 3   # true degree
+summary_df <- do.call(rbind, lapply(results, function(res) {
+  data.frame(
+    n            = res$n,
+    AIC_exact    = mean(res$aic == p_star),
+    BIC_exact    = mean(res$bic == p_star),
+    AIC_mean_deg = round(mean(res$aic), 2),
+    BIC_mean_deg = round(mean(res$bic), 2)
+  )
+}))
+print(summary_df)
+
+# ── Visualisation ────────────────────────────────────────────────
+library(ggplot2)
+library(tidyr)
+plot_df <- do.call(rbind, lapply(results, function(res) {
+  data.frame(
+    n   = res$n,
+    AIC = res$aic,
+    BIC = res$bic
+  )
+})) |>
+  pivot_longer(c(AIC, BIC), names_to = "Criterion", values_to = "Selected_p")
+
+ggplot(plot_df, aes(x = factor(n), y = Selected_p, fill = Criterion)) +
+  geom_boxplot(alpha = 0.7, outlier.size = 0.8) +
+  geom_hline(yintercept = p_star, linetype = "dashed", colour = "black") +
+  facet_wrap(~Criterion) +
+  labs(title = "Selected polynomial degree by AIC and BIC",
+       subtitle = "Dashed line = true degree (p* = 3)",
+       x = "Sample size n", y = "Selected polynomial degree") +
+  theme_minimal()</code></pre>
+
+          <p><strong>Interpretation:</strong></p>
+          <ul>
+            <li>
+              <strong>BIC is consistent:</strong> as $n \to \infty$, BIC selects the true degree
+              with probability approaching 1. The "exact selection" rate climbs sharply from
+              around 20% at $n=25$ to near 100% at $n=1000$.
+            </li>
+            <li>
+              <strong>AIC is not consistent:</strong> even at $n=1000$, AIC occasionally selects
+              a degree higher than 3 — typically 4 or 5. Its penalty of $2$ per parameter is
+              not large enough to suppress small improvements in fit from spurious terms.
+              The asymptotic false-positive probability is approximately $P(\chi^2_1 > 2) \approx 0.157$.
+            </li>
+            <li>
+              <strong>At small $n$:</strong> BIC is more conservative (may underfit with degree 1 or 2);
+              AIC is slightly more reliable at recovering the true model when the signal-to-noise
+              ratio is low.
+            </li>
+          </ul>
+
+        </div>
+      </details>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="q2">Exercise 2 — Misspecified Candidate Set</h2>
+
+      <div class="callout example">
+        <div class="callout-title">📝 Exercise 2</div>
+        <p>
+          Now use the <strong>logistic</strong> true mean function:
+          $$w(x) = \frac{1.2}{1 + e^{-x}}$$
+          This is a smooth sigmoid that cannot be exactly represented by any polynomial.
+        </p>
+        <p>
+          Re-run <code>run_sim</code> with this new $w$ for $n \in \{50, 200, 1000\}$.
+          Answer the following:
+        </p>
+        <ol>
+          <li>
+            Since the true model is not in the candidate set, there is no "correct" degree.
+            Which degree does each criterion prefer? Does it increase with $n$?
+          </li>
+          <li>
+            What does this tell you about the difference between AIC's goal
+            (predictive accuracy) and BIC's goal (finding the true model)?
+          </li>
+          <li>
+            Would you expect AIC or BIC to perform better as a predictor when the
+            true model is never in the candidate set?
+          </li>
+        </ol>
+      </div>
+
+      <details class="proof-details">
+        <summary>Solution to Exercise 2</summary>
+        <div class="proof-body">
+
+          <div class="code-label">R — Solution</div>
+          <pre><code class="language-r"># ── Logistic w function ──────────────────────────────────────────
+w_logistic <- function(x) 1.2 / (1 + exp(-x))
+
+# ── Run simulation with misspecified candidate set ───────────────
+results_mis <- lapply(c(50, 200, 1000), run_sim,
+                      w_fn = w_logistic, B = 200)
+
+# ── Selected degree distributions ────────────────────────────────
+lapply(results_mis, function(res) {
+  cat("\nn =", res$n, "\n")
+  cat("AIC distribution:\n"); print(table(res$aic))
+  cat("BIC distribution:\n"); print(table(res$bic))
+})
+
+# ── Plot: selected degree vs. n ──────────────────────────────────
+plot_df2 <- do.call(rbind, lapply(results_mis, function(res) {
+  data.frame(n = res$n, AIC = res$aic, BIC = res$bic)
+})) |>
+  pivot_longer(c(AIC, BIC), names_to = "Criterion", values_to = "Selected_p")
+
+ggplot(plot_df2, aes(x = Selected_p, fill = factor(n))) +
+  geom_bar(position = "dodge") +
+  facet_wrap(~Criterion, scales = "free_y") +
+  labs(title = "Misspecified candidate set: selected degree distributions",
+       x = "Selected polynomial degree", fill = "n") +
+  theme_minimal()</code></pre>
+
+          <p><strong>Key findings:</strong></p>
+          <ul>
+            <li>
+              <strong>AIC selects increasingly complex models as $n$ grows.</strong>
+              The logistic function requires many polynomial terms to approximate well,
+              so AIC keeps rewarding higher degrees for their improved fit. With $n=1000$,
+              AIC may select degrees 8–12.
+            </li>
+            <li>
+              <strong>BIC is more conservative but also increases with $n$</strong>, albeit
+              more slowly. It does not converge to a fixed degree since there is no true model
+              in the set.
+            </li>
+            <li>
+              <strong>Lesson:</strong> When the true model is absent from the candidate set
+              (the realistic situation), AIC's goal of predictive accuracy is more appropriate.
+              BIC's "find the true model" guarantee breaks down entirely. In this scenario,
+              AIC tends to produce better out-of-sample predictions.
+            </li>
+          </ul>
+
+        </div>
+      </details>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="q3">Exercise 3 — AIC as an Estimator of Prediction Error</h2>
+
+      <div class="callout example">
+        <div class="callout-title">📝 Exercise 3</div>
+        <p>
+          Define the scaled prediction error as:
+          $$\Delta(p) = -\frac{1}{nM}\, \mathbb{E}_{\mathbf{y}^*}\!\left[\ell(\hat{\boldsymbol{\beta}}_p; \mathbf{y}^*)\right]$$
+          where $\mathbf{y}^*$ is a new independent dataset of size $nM$ and
+          $\hat{\boldsymbol{\beta}}_p$ is fitted on the training data.
+        </p>
+        <ol>
+          <li>
+            Show that $-\mathrm{AIC}/(2nM)$ is an estimator of $\Delta(p)$ up to a constant.
+          </li>
+          <li>
+            Estimate $\Delta(p)$ <em>directly</em> by simulation: for each replicate, generate
+            a training set of size $nM$ and an independent test set of size $nM$. Fit each
+            polynomial on the training set and evaluate the Poisson log-likelihood on the
+            test set. Average over $B$ replicates.
+          </li>
+          <li>
+            Plot AIC/$(-2nM)$ and the direct $\hat{\Delta}(p)$ on the same axes for
+            $n \in \{25, 200, 1000\}$. Do they agree? Where do they differ?
+          </li>
+        </ol>
+      </div>
+
+      <details class="proof-details">
+        <summary>Solution to Exercise 3</summary>
+        <div class="proof-body">
+
+          <p><strong>Part 1: Why $-\mathrm{AIC}/(2nM)$ estimates $\Delta(p)$.</strong></p>
+          <p>
+            Recall $\mathrm{AIC} = 2(p+1) - 2\ell(\hat{\boldsymbol{\beta}}_p)$. Therefore:
+          </p>
+          $$-\frac{\mathrm{AIC}}{2nM} = \frac{\ell(\hat{\boldsymbol{\beta}}_p)}{nM} - \frac{p+1}{nM}$$
+          <p>
+            From the AIC derivation (Chapter 1, Theorem 1.3), $\ell(\hat{\boldsymbol{\beta}}_p)/(nM)$
+            is an overoptimistic estimator of $-\Delta(p)$ with bias $\approx (p+1)/(nM)$.
+            Subtracting this bias correction gives:
+          </p>
+          $$-\frac{\mathrm{AIC}}{2nM} \approx -\Delta(p) \implies -\frac{\mathrm{AIC}}{2nM} \text{ estimates } -\Delta(p)$$
+
+          <div class="code-label">R — Parts 2 &amp; 3</div>
+          <pre><code class="language-r"># ── Direct estimation of Delta(p) ────────────────────────────────
+estimate_delta <- function(n, M = 3, w_fn, p_max = 20, B = 200, seed = 99) {
+  set.seed(seed)
+  x <- -10 + 20 * (seq_len(n) - 1) / (n - 1)
+  mu_fn <- function(x) 8 * exp(w_fn(x))
+
+  delta_mat <- aic_mat <- matrix(NA_real_, nrow = B, ncol = p_max)
+
+  for (b in seq_len(B)) {
+    # Training data
+    y_train <- as.vector(replicate(M, rpois(n, mu_fn(x))))
+    x_train <- rep(x, M)
+
+    # Independent test data (same size)
+    y_test  <- as.vector(replicate(M, rpois(n, mu_fn(x))))
+
+    for (p in seq_len(p_max)) {
+      fit <- glm(y_train ~ poly(x_train, p), family = poisson)
+      aic_mat[b, p] <- AIC(fit)
+
+      # Predict on test set using fitted coefficients
+      x_test_poly <- poly(x_train, p, coefs = attr(poly(x_train, p), "coefs"))
+      # Refit on test design matrix
+      eta_test <- predict(fit, newdata = data.frame(x_train = x))
+      eta_test <- rep(eta_test, M)
+      mu_hat   <- exp(predict(fit))
+      # Use same design matrix (same x) for test set
+      log_lik_test <- sum(dpois(y_test, lambda = exp(predict(fit)), log = TRUE))
+      delta_mat[b, p] <- -log_lik_test / (n * M)
+    }
+  }
+
+  # AIC-based estimate: -AIC/(2nM) approximates -Delta
+  aic_delta <- -colMeans(aic_mat) / (2 * n * M)
+
+  list(
+    delta_direct = colMeans(delta_mat),
+    aic_delta    = aic_delta,
+    n            = n
+  )
+}
+
+# Run for three sample sizes
+w_cubic  <- function(x) 0.001 * (100 + x + x^2 + x^3)
+res_list <- lapply(c(25, 200, 1000), estimate_delta, w_fn = w_cubic, B = 100)
+
+# Plot comparison
+library(ggplot2); library(tidyr)
+plot_df <- do.call(rbind, lapply(res_list, function(res) {
+  p <- seq_len(length(res$delta_direct))
+  data.frame(
+    n     = res$n,
+    p     = p,
+    Direct = res$delta_direct,
+    AIC    = res$aic_delta
+  )
+})) |>
+  pivot_longer(c(Direct, AIC), names_to = "Method", values_to = "Delta")
+
+ggplot(plot_df, aes(x = p, y = Delta, colour = Method, linetype = Method)) +
+  geom_line(linewidth = 0.9) +
+  facet_wrap(~n, scales = "free_y",
+             labeller = labeller(n = function(x) paste0("n = ", x))) +
+  labs(title = "AIC-based vs. direct estimate of prediction error Δ(p)",
+       x = "Polynomial degree p", y = "Δ(p)") +
+  theme_minimal()</code></pre>
+
+          <p><strong>Interpretation:</strong></p>
+          <ul>
+            <li>
+              The AIC-based curve and the direct Monte Carlo curve track each other closely
+              at large $n$ — validating the AIC bias-correction theorem.
+            </li>
+            <li>
+              At small $n = 25$, AIC underestimates the bias (the curves diverge for large $p$),
+              because the $O(1/n)$ correction is too small. AIC$_c$ would improve this.
+            </li>
+            <li>
+              The minimum of $\Delta(p)$ corresponds to the best-predicting polynomial degree —
+              this is what AIC is trying to identify. BIC minimises a different objective
+              (posterior model probability) and will generally pick a smaller $p$.
+            </li>
+          </ul>
+
+        </div>
+      </details>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="q4">Exercise 4 — Extension: AICc vs. AIC</h2>
+
+      <div class="callout example">
+        <div class="callout-title">📝 Exercise 4 (Extension)</div>
+        <p>
+          For small $n = 25$ with the cubic $w$, compare AIC, AIC$_c$, and BIC.
+          Recall AIC$_c = \mathrm{AIC} + 2p(p+1)/(n-p-1)$.
+        </p>
+        <ol>
+          <li>Implement AIC$_c$ for Poisson GLMs (note: $p$ is the number of parameters including intercept).</li>
+          <li>
+            Plot selection frequency histograms for all three criteria side by side.
+            Does AIC$_c$ fix the overfitting tendency of AIC at small $n$?
+          </li>
+        </ol>
+      </div>
+
+      <details class="proof-details">
+        <summary>Solution to Exercise 4</summary>
+        <div class="proof-body">
+          <div class="code-label">R — Solution</div>
+          <pre><code class="language-r">aicc <- function(fit) {
+  k <- length(coef(fit))
+  n <- nobs(fit)
+  AIC(fit) + 2 * k * (k + 1) / (n - k - 1)
+}
+
+w_cubic <- function(x) 0.001 * (100 + x + x^2 + x^3)
+n <- 25; M <- 3; B <- 300; p_max <- 15
+x <- -10 + 20 * (seq_len(n) - 1) / (n - 1)
+mu_fn <- function(x) 8 * exp(w_cubic(x))
+
+set.seed(7)
+sels <- data.frame(AIC = integer(B), AICc = integer(B), BIC = integer(B))
+
+for (b in seq_len(B)) {
+  y_all <- as.vector(replicate(M, rpois(n, mu_fn(x))))
+  x_all <- rep(x, M)
+  aic_v <- bic_v <- aicc_v <- numeric(p_max)
+  for (p in seq_len(p_max)) {
+    fit <- glm(y_all ~ poly(x_all, p), family = poisson)
+    aic_v[p]  <- AIC(fit)
+    bic_v[p]  <- BIC(fit)
+    aicc_v[p] <- aicc(fit)
+  }
+  sels$AIC[b]  <- which.min(aic_v)
+  sels$BIC[b]  <- which.min(bic_v)
+  sels$AICc[b] <- which.min(aicc_v)
+}
+
+# Proportion selecting true degree p*=3
+cat("AIC  exact:", mean(sels$AIC  == 3), "\n")
+cat("AICc exact:", mean(sels$AICc == 3), "\n")
+cat("BIC  exact:", mean(sels$BIC  == 3), "\n")
+
+# Bar chart
+library(ggplot2); library(tidyr)
+sels |>
+  pivot_longer(everything(), names_to = "Criterion", values_to = "p") |>
+  ggplot(aes(x = p, fill = Criterion)) +
+  geom_bar(position = "dodge") +
+  geom_vline(xintercept = 3, linetype = "dashed") +
+  labs(title = "Selection frequency at n=25 (dashed = true p*=3)",
+       x = "Selected degree", y = "Count") +
+  theme_minimal()</code></pre>
+
+          <p>
+            At $n = 25$, AIC$_c$ substantially reduces overfitting relative to AIC and
+            approaches BIC in accuracy. For very small $n$, AIC$_c$ should always be
+            preferred over plain AIC.
+          </p>
+        </div>
+      </details>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="summary">Lab Summary</h2>
+
+      <div class="key-points">
+        <h4>What we learned from Lab 1</h4>
+        <ul>
+          <li>
+            <strong>BIC is consistent</strong> when the true model is in the candidate set:
+            selection accuracy improves systematically with $n$.
+          </li>
+          <li>
+            <strong>AIC is not consistent</strong> but tends to give better predictions when
+            the true model is absent from the candidate set.
+          </li>
+          <li>
+            <strong>$-\mathrm{AIC}/(2n)$ estimates the prediction error $\Delta$</strong>,
+            confirming the theoretical result from Chapter 1.
+          </li>
+          <li>
+            At small $n$, <strong>AIC$_c$</strong> substantially improves on AIC by using
+            a more accurate finite-sample bias correction.
+          </li>
+          <li>
+            Simulation is a powerful diagnostic tool: knowing the truth lets you benchmark
+            criteria in ways impossible with real data.
+          </li>
+        </ul>
+      </div>
+
+      <div class="chapter-nav">
+        <a href="bibliography.html">
+          <span class="nav-label">← Previous</span>
+          <span class="nav-title">Bibliography</span>
+        </a>
+        <a href="lab2.html" class="next">
+          <span class="nav-label">Next →</span>
+          <span class="nav-title">Lab 2 — Linear Mixed Models</span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+</body>
+</html>

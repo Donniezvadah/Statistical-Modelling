@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 2: Linear Mixed Models — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams' },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="lab2">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Lab 2</span>
+        <span class="chapter-tag">Linear Mixed Models</span>
+        <span class="chapter-tag">lme4 · REML · BLUPs · Prediction</span>
+      </div>
+
+      <h1 class="page-title">Lab 2 — Linear Mixed Models</h1>
+      <p class="page-subtitle">Analysing haematocrit recovery after hip replacement surgery</p>
+
+      <div class="callout note">
+        <div class="callout-title">📋 Lab Overview</div>
+        <ul>
+          <li><strong>Topic:</strong> Linear mixed models for longitudinal data</li>
+          <li><strong>Data:</strong> Haematocrit measurements from hip replacement patients</li>
+          <li><strong>Package:</strong> <code>lme4</code></li>
+          <li><strong>Skills:</strong> EDA, model building, REML vs ML, BLUPs, prediction for new subjects</li>
+          <li><strong>Solutions:</strong> Provided below each exercise — attempt independently first!</li>
+        </ul>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="data">The Hip Replacement Dataset</h2>
+
+      <p>
+        Hip replacement surgery involves substantial blood loss. After surgery, a patient's
+        <strong>haematocrit</strong> (the proportion of blood volume occupied by red blood cells,
+        expressed as a percentage) drops and then gradually recovers. We are interested in:
+      </p>
+      <ul>
+        <li>The typical recovery trajectory over three time points</li>
+        <li>Whether males and females recover differently</li>
+        <li>Whether age affects recovery</li>
+        <li>Between-subject variability in recovery</li>
+      </ul>
+
+      <h3 id="data-structure">Dataset Structure</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Variable</th><th>Type</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>y</code></td><td>Continuous</td><td>Haematocrit (%)</td></tr>
+            <tr><td><code>time</code></td><td>Factor (3 levels)</td><td>1 = pre-op, 2 = post-op day 1, 3 = post-op day 4</td></tr>
+            <tr><td><code>sex</code></td><td>Binary (0/1)</td><td>0 = male, 1 = female</td></tr>
+            <tr><td><code>age</code></td><td>Continuous</td><td>Age in years at time of surgery</td></tr>
+            <tr><td><code>subj</code></td><td>Integer</td><td>Subject identifier (30 patients)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        The dataset has 88 observations from 30 subjects. Each subject has measurements at
+        up to 3 time points (some may have missing post-operative measurements).
+      </p>
+
+      <h3 id="load-data">Loading the Data</h3>
+
+      <div class="code-label">R</div>
+      <pre><code class="language-r">library(lme4)
+library(ggplot2)
+library(dplyr)
+
+# ── Load from remote URL ─────────────────────────────────────────
+hip_url <- url("https://ikosmidis.com/files/APTS-SM-Notes/resources/hip.txt")
+hip <- read.table(hip_url,
+                  col.names   = c("y", "age", "sex", "subj", "time"),
+                  colClasses  = c(rep("numeric", 4), "factor"))
+
+# Convert sex and subj to factors
+hip$sex  <- factor(hip$sex,  levels = 0:1, labels = c("Male", "Female"))
+hip$subj <- factor(hip$subj)
+
+# Quick look
+str(hip)
+head(hip, 10)
+summary(hip)</code></pre>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="ex1">Exercise 1 — Exploratory Data Analysis</h2>
+
+      <div class="callout example">
+        <div class="callout-title">📝 Exercise 1</div>
+        <p>Before fitting any model, explore the data carefully.</p>
+        <ol>
+          <li>
+            Plot <strong>individual haematocrit profiles</strong> over time, separately
+            for males and females. Connect the three time-point observations for each subject
+            with a line. What patterns do you notice?
+          </li>
+          <li>
+            Based on the plot, argue whether a <strong>random intercept</strong> is needed
+            (i.e., do subjects differ systematically in their baseline haematocrit?).
+          </li>
+          <li>
+            Does the slope of the recovery trajectory vary across subjects? Would a
+            <strong>random slope for time</strong> improve the model?
+          </li>
+          <li>
+            Compute summary statistics (mean, SD) of haematocrit by time and sex.
+            Is there a visible sex difference?
+          </li>
+        </ol>
+      </div>
+
+      <details class="proof-details">
+        <summary>Solution to Exercise 1</summary>
+        <div class="proof-body">
+          <div class="code-label">R — Solution</div>
+          <pre><code class="language-r"># ── 1. Individual profiles ───────────────────────────────────────
+ggplot(hip, aes(x = time, y = y, group = subj, colour = sex)) +
+  geom_line(alpha = 0.6) +
+  geom_point(size = 1.8) +
+  facet_wrap(~sex) +
+  scale_colour_manual(values = c("steelblue", "tomato")) +
+  labs(
+    title    = "Individual haematocrit profiles by sex",
+    subtitle = "Time: 1 = pre-op, 2 = day 1 post-op, 3 = day 4 post-op",
+    x = "Time", y = "Haematocrit (%)"
+  ) +
+  theme_minimal(base_size = 12)
+
+# ── 2 & 3. Random intercept and slope diagnostics ────────────────
+# Fit naive OLS ignoring subject
+fit_ols <- lm(y ~ time + sex + age, data = hip)
+hip$resid_ols <- residuals(fit_ols)
+
+# Plot OLS residuals by subject
+ggplot(hip, aes(x = time, y = resid_ols, group = subj, colour = subj)) +
+  geom_line(alpha = 0.5) +
+  guides(colour = "none") +
+  labs(title = "OLS residuals: each line = one subject",
+       subtitle = "Lines hugging one side → random intercept needed",
+       x = "Time", y = "OLS residual") +
+  theme_minimal()
+
+# ── 4. Summary by time and sex ───────────────────────────────────
+hip |>
+  group_by(time, sex) |>
+  summarise(
+    n    = n(),
+    mean = round(mean(y), 2),
+    sd   = round(sd(y),   2),
+    .groups = "drop"
+  ) |>
+  print()</code></pre>
+
+          <p><strong>What to look for in the plots:</strong></p>
+          <ul>
+            <li>
+              <strong>Random intercept:</strong> If the profiles are roughly parallel (same
+              shape, different heights), a random intercept captures the between-subject
+              baseline differences. In hip data, subjects start at quite different haematocrit
+              levels — a random intercept is clearly needed.
+            </li>
+            <li>
+              <strong>Random slope:</strong> If the lines cross frequently, subjects differ
+              in their rate of change — a random slope for time would improve fit.
+              In this dataset, there is modest crossing, suggesting a random slope may be
+              marginally beneficial but is not essential.
+            </li>
+            <li>
+              <strong>Sex difference:</strong> Females typically have lower baseline
+              haematocrit (around 37–38%) compared to males (around 42–43%). The difference
+              tends to persist across all three time points.
+            </li>
+          </ul>
+        </div>
+      </details>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="ex2">Exercise 2 — Building the Linear Mixed Model</h2>
+
+      <div class="callout example">
+        <div class="callout-title">📝 Exercise 2</div>
+        <p>
+          Fit a sequence of LMMs using <code>lme4::lmer()</code>. The general model is:
+        </p>
+        $$Y_{ij} = \mathbf{x}_{ij}^\top \boldsymbol{\beta} + \mathbf{z}_{ij}^\top \mathbf{b}_i + \varepsilon_{ij}$$
+        <p>
+          where $\mathbf{x}_{ij}$ contains fixed effects (time, sex, age, interactions)
+          and $\mathbf{z}_{ij}$ specifies the random effects structure for subject $i$.
+        </p>
+        <ol>
+          <li>
+            Fit the following four models using REML:
+            <ul>
+              <li><strong>M1:</strong> Fixed: <code>time + sex + age</code>; Random: intercept per subject</li>
+              <li><strong>M2:</strong> Fixed: <code>time * sex + age</code>; Random: intercept per subject</li>
+              <li><strong>M3:</strong> Fixed: <code>time * sex + age</code>; Random: intercept + slope for time</li>
+              <li><strong>M4:</strong> Fixed: <code>time * sex + age + time:age</code>; Random: intercept per subject</li>
+            </ul>
+          </li>
+          <li>
+            Compare all four models using AIC and BIC (refit with ML for the AIC/BIC comparison).
+            Which model does each criterion prefer?
+          </li>
+          <li>
+            For the best model, interpret each fixed-effect coefficient. What is the estimated
+            sex difference in haematocrit? How does it change over time?
+          </li>
+          <li>
+            Extract and report the estimated variance components $\hat{\sigma}_b^2$ and $\hat{\sigma}^2$.
+            Compute the intraclass correlation coefficient (ICC).
+          </li>
+        </ol>
+      </div>
+
+      <details class="proof-details">
+        <summary>Solution to Exercise 2</summary>
+        <div class="proof-body">
+          <div class="code-label">R — Solution</div>
+          <pre><code class="language-r">library(lme4)
+
+# ── Fit four models (REML for estimation) ───────────────────────
+M1 <- lmer(y ~ time + sex + age + (1 | subj),
+           data = hip, REML = TRUE)
+
+M2 <- lmer(y ~ time * sex + age + (1 | subj),
+           data = hip, REML = TRUE)
+
+M3 <- lmer(y ~ time * sex + age + (time | subj),
+           data = hip, REML = TRUE)
+
+M4 <- lmer(y ~ time * sex + age + time:age + (1 | subj),
+           data = hip, REML = TRUE)
+
+# ── Refit with ML for AIC/BIC comparison ────────────────────────
+M1_ml <- update(M1, REML = FALSE)
+M2_ml <- update(M2, REML = FALSE)
+M3_ml <- update(M3, REML = FALSE)
+M4_ml <- update(M4, REML = FALSE)
+
+aic_bic <- data.frame(
+  Model = c("M1","M2","M3","M4"),
+  AIC   = round(c(AIC(M1_ml), AIC(M2_ml), AIC(M3_ml), AIC(M4_ml)), 2),
+  BIC   = round(c(BIC(M1_ml), BIC(M2_ml), BIC(M3_ml), BIC(M4_ml)), 2)
+)
+print(aic_bic)
+
+# ── Summary of best model (say M2) ──────────────────────────────
+summary(M2)
+
+# ── Variance components ─────────────────────────────────────────
+vc <- as.data.frame(VarCorr(M2))
+print(vc)
+
+# ICC
+sigma_b2 <- vc$vcov[vc$grp == "subj"]
+sigma2   <- vc$vcov[vc$grp == "Residual"]
+icc      <- sigma_b2 / (sigma_b2 + sigma2)
+cat(sprintf("sigma_b^2 = %.3f,  sigma^2 = %.3f,  ICC = %.3f\n",
+            sigma_b2, sigma2, icc))</code></pre>
+
+          <p><strong>Interpreting the fixed effects (M2 as example):</strong></p>
+          <ul>
+            <li>
+              <strong><code>time2</code>:</strong> The change in haematocrit from pre-op to
+              day 1 post-op for a male patient. Typically strongly negative (surgery causes
+              blood loss).
+            </li>
+            <li>
+              <strong><code>time3</code>:</strong> The change from pre-op to day 4 post-op
+              for males. Should be less negative than <code>time2</code> (some recovery
+              by day 4).
+            </li>
+            <li>
+              <strong><code>sexFemale</code>:</strong> Baseline (pre-op) haematocrit
+              difference between females and males. Typically negative (females have
+              lower haematocrit on average).
+            </li>
+            <li>
+              <strong><code>time2:sexFemale</code>, <code>time3:sexFemale</code>:</strong>
+              Whether the drop and recovery pattern differs between sexes.
+            </li>
+            <li>
+              <strong><code>age</code>:</strong> Effect of age on haematocrit. Older patients
+              may have lower baseline levels.
+            </li>
+            <li>
+              <strong>ICC:</strong> Typically around 0.6–0.8, meaning 60–80% of total
+              variation is between subjects. This confirms the random intercept is important.
+            </li>
+          </ul>
+        </div>
+      </details>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="ex3">Exercise 3 — Visualising Fitted Trajectories</h2>
+
+      <div class="callout example">
+        <div class="callout-title">📝 Exercise 3</div>
+        <p>
+          Using your best-fitting model:
+        </p>
+        <ol>
+          <li>
+            Plot the <strong>fitted haematocrit trajectories</strong> for each subject
+            (using BLUPs for the random effects) against the observed data.
+            Use different colours for males and females.
+          </li>
+          <li>
+            Extract the BLUPs $\hat{b}_i$ for all 30 subjects. Plot them against age.
+            Do older subjects have different baseline haematocrit adjustments?
+          </li>
+          <li>
+            Plot the <strong>marginal fitted trajectory</strong> (fixed effects only,
+            setting $b_i = 0$) for an average-aged male and female. Add 95% confidence
+            bands. How large is the estimated sex difference pre- and post-surgery?
+          </li>
+        </ol>
+      </div>
+
+      <details class="proof-details">
+        <summary>Solution to Exercise 3</summary>
+        <div class="proof-body">
+          <div class="code-label">R — Solution</div>
+          <pre><code class="language-r"># Assume M2 is the best model
+best_model <- M2
+
+# ── 1. Individual fitted trajectories ───────────────────────────
+hip$fitted_blup <- fitted(best_model)
+
+ggplot(hip, aes(x = time, group = subj, colour = sex)) +
+  geom_line(aes(y = y),           alpha = 0.3, linetype = "solid") +
+  geom_line(aes(y = fitted_blup), alpha = 0.8, linetype = "dashed") +
+  scale_colour_manual(values = c("steelblue","tomato")) +
+  facet_wrap(~sex) +
+  labs(
+    title    = "Observed (solid) and BLUP-fitted (dashed) trajectories",
+    x = "Time", y = "Haematocrit (%)"
+  ) +
+  theme_minimal()
+
+# ── 2. BLUPs vs age ─────────────────────────────────────────────
+blups <- ranef(best_model)$subj
+blups$subj <- rownames(blups)
+blups <- merge(blups,
+               hip[!duplicated(hip$subj), c("subj","age","sex")],
+               by = "subj")
+names(blups)[2] <- "b_hat"
+
+ggplot(blups, aes(x = age, y = b_hat, colour = sex, label = subj)) +
+  geom_point(size = 3) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.8) +
+  scale_colour_manual(values = c("steelblue","tomato")) +
+  labs(title = "BLUPs vs age: do older patients have lower baseline?",
+       x = "Age (years)", y = expression(hat(b)[i])) +
+  theme_minimal()
+
+# ── 3. Marginal trajectories with confidence bands ───────────────
+# Create prediction grid (average age, both sexes)
+mean_age <- mean(hip$age)
+pred_df  <- expand.grid(
+  time = factor(1:3),
+  sex  = factor(c("Male","Female")),
+  age  = mean_age,
+  subj = NA          # new subject -> b_i = 0
+)
+
+# Use predict with re.form = NA for population (marginal) predictions
+pred_df$fit <- predict(best_model, newdata = pred_df, re.form = NA)
+
+# Bootstrap 95% CI (parametric)
+boot_preds <- bootMer(best_model,
+                      FUN = function(m) predict(m, newdata = pred_df, re.form = NA),
+                      nsim = 500, seed = 42, use.u = FALSE)
+pred_df$lwr <- apply(boot_preds$t, 2, quantile, 0.025)
+pred_df$upr <- apply(boot_preds$t, 2, quantile, 0.975)
+
+ggplot(pred_df, aes(x = time, y = fit, colour = sex, fill = sex, group = sex)) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.2, colour = NA) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = c("steelblue","tomato")) +
+  scale_fill_manual(values = c("steelblue","tomato")) +
+  labs(
+    title    = "Marginal fitted trajectories (average-age patient)",
+    subtitle = "Shaded bands = bootstrap 95% CI",
+    x = "Time (1=pre-op, 2=day 1, 3=day 4)", y = "Haematocrit (%)"
+  ) +
+  theme_minimal()</code></pre>
+        </div>
+      </details>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="ex4">Exercise 4 — Predicting Incomplete Profiles</h2>
+
+      <div class="callout example">
+        <div class="callout-title">📝 Exercise 4</div>
+        <p>
+          A key strength of mixed models is the ability to predict an individual's
+          complete trajectory even when their data are incomplete.
+        </p>
+        <ol>
+          <li>
+            Identify two subjects in the dataset who have only <strong>pre-operative</strong>
+            measurements (time point 1 only), or simulate two such "new" patients with
+            known age and sex but only a pre-op haematocrit value.
+          </li>
+          <li>
+            For each patient, compute:
+            <ul>
+              <li>The <strong>population prediction</strong> (fixed effects only, $\hat{b}_i = 0$)</li>
+              <li>The <strong>individual prediction</strong> using the BLUP $\hat{b}_i$ estimated from their single pre-op observation</li>
+            </ul>
+          </li>
+          <li>
+            Compare the two predictions. How much does knowing the pre-op value improve
+            the post-op prediction? Express the difference in haematocrit units.
+          </li>
+          <li>
+            <strong>Extension:</strong> Derive analytically the BLUP formula for a
+            random-intercept-only model when only one observation $y_{i1}$ is available.
+            Show that the BLUP shrinks the observed deviation toward zero.
+          </li>
+        </ol>
+      </div>
+
+      <details class="proof-details">
+        <summary>Solution to Exercise 4</summary>
+        <div class="proof-body">
+          <div class="code-label">R — Parts 1–3</div>
+          <pre><code class="language-r"># ── Create two "new" patients with only pre-op observation ───────
+new_patients <- data.frame(
+  subj = factor(c("New1", "New2")),
+  age  = c(65, 72),
+  sex  = factor(c("Male", "Female")),
+  time = factor(c(1, 1)),
+  y    = c(44.5, 38.2)   # their observed pre-op haematocrit
+)
+
+# ── Population prediction (b_i = 0) ─────────────────────────────
+pred_grid <- expand.grid(
+  time = factor(1:3),
+  stringsAsFactors = FALSE
+)
+for (i in 1:nrow(new_patients)) {
+  pt_data <- new_patients[i, ]
+  pred_all_times <- lapply(1:3, function(t) {
+    data.frame(
+      subj = pt_data$subj,
+      age  = pt_data$age,
+      sex  = pt_data$sex,
+      time = factor(t)
+    )
+  }) |> do.call(rbind)
+
+  pop_pred <- predict(best_model, newdata = pred_all_times, re.form = NA)
+  cat(sprintf("\nPatient %s (age=%d, %s, pre-op y=%.1f)\n",
+              as.character(pt_data$subj), pt_data$age,
+              as.character(pt_data$sex), pt_data$y))
+  cat("Population predictions:", round(pop_pred, 2), "\n")
+}
+
+# ── Individual prediction via BLUP ───────────────────────────────
+# Manually compute BLUP for random-intercept model
+# BLUP(b_i) = sigma_b^2 / (sigma_b^2 + sigma^2/n_i) * (y_bar_i - x_i'beta_hat)
+
+vc         <- as.data.frame(VarCorr(best_model))
+sigma_b2   <- vc$vcov[vc$grp == "subj"]
+sigma2     <- vc$vcov[vc$grp == "Residual"]
+shrinkage  <- sigma_b2 / (sigma_b2 + sigma2 / 1)   # n_i = 1 obs
+
+for (i in 1:nrow(new_patients)) {
+  pt <- new_patients[i, ]
+  # Population-predicted pre-op value
+  pop_preop <- predict(best_model,
+                       newdata = data.frame(subj=factor("NewX"),
+                                            age=pt$age, sex=pt$sex, time=factor(1)),
+                       re.form = NA)
+  deviation  <- pt$y - pop_preop
+  blup_b     <- shrinkage * deviation
+
+  cat(sprintf(
+    "\nPatient %s: deviation=%.2f, shrinkage=%.3f, BLUP(b_i)=%.2f\n",
+    as.character(pt$subj), deviation, shrinkage, blup_b
+  ))
+  cat(sprintf(
+    "Population post-op day4 prediction: %.2f\n",
+    predict(best_model,
+            newdata=data.frame(subj=factor("NewX"),
+                               age=pt$age, sex=pt$sex, time=factor(3)),
+            re.form=NA)
+  ))
+  cat(sprintf(
+    "Individual  post-op day4 prediction: %.2f  (adjusted by %.2f)\n",
+    predict(best_model,
+            newdata=data.frame(subj=factor("NewX"),
+                               age=pt$age, sex=pt$sex, time=factor(3)),
+            re.form=NA) + blup_b,
+    blup_b
+  ))
+}</code></pre>
+
+          <p><strong>Part 4: Analytic BLUP derivation.</strong></p>
+          <p>
+            For a random-intercept model $Y_{ij} = \mu_{ij} + b_i + \varepsilon_{ij}$
+            with $b_i \sim \mathrm{N}(0, \sigma_b^2)$ and $\varepsilon_{ij} \sim \mathrm{N}(0, \sigma^2)$,
+            suppose we observe only one value $y_{i1}$ for subject $i$.
+            Define $e_{i1} = y_{i1} - \mu_{i1}$ (observed deviation from fixed-effect prediction).
+          </p>
+          <p>
+            The BLUP minimises $\mathbb{E}[(b_i - \hat{b}_i)^2]$ over all linear estimators of $b_i$.
+            By direct calculation:
+          </p>
+          $$\hat{b}_i = \frac{\sigma_b^2}{\sigma_b^2 + \sigma^2} e_{i1} = \rho \cdot e_{i1}$$
+          <p>
+            where $\rho = \sigma_b^2 / (\sigma_b^2 + \sigma^2) \in (0,1)$ is the ICC.
+          </p>
+          <ul>
+            <li>
+              If ICC $\approx 1$ (most variation is between subjects): $\hat{b}_i \approx e_{i1}$
+              — we trust the single observation heavily.
+            </li>
+            <li>
+              If ICC $\approx 0$ (most variation is within-subject noise): $\hat{b}_i \approx 0$
+              — the single observation is too noisy to update our estimate.
+            </li>
+          </ul>
+          <p>
+            With multiple observations $n_i$, the formula generalises to:
+          </p>
+          $$\hat{b}_i = \frac{n_i \sigma_b^2}{n_i \sigma_b^2 + \sigma^2} \bar{e}_i$$
+          <p>
+            As $n_i \to \infty$, $\hat{b}_i \to \bar{e}_i$ (we trust the data completely);
+            as $n_i \to 0$, $\hat{b}_i \to 0$ (we revert to the population mean).
+            This is the <strong>shrinkage</strong> property of BLUPs.
+          </p>
+        </div>
+      </details>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="ex5">Exercise 5 — Testing Fixed Effects</h2>
+
+      <div class="callout example">
+        <div class="callout-title">📝 Exercise 5</div>
+        <ol>
+          <li>
+            Test whether the <strong>time × sex interaction</strong> is statistically
+            significant using a likelihood ratio test. Remember: use ML (not REML)
+            for comparing models with different fixed effects.
+          </li>
+          <li>
+            Test whether <strong>age</strong> has a significant effect on haematocrit.
+          </li>
+          <li>
+            Use the <code>anova()</code> function in lme4 and interpret the output.
+            What are the degrees of freedom for each test? Why?
+          </li>
+        </ol>
+      </div>
+
+      <details class="proof-details">
+        <summary>Solution to Exercise 5</summary>
+        <div class="proof-body">
+          <div class="code-label">R — Solution</div>
+          <pre><code class="language-r"># ── All models fitted with ML ────────────────────────────────────
+# M2: time * sex + age + (1|subj)  [includes interaction]
+# M1: time + sex + age + (1|subj)  [no interaction]
+# M_noage: time * sex + (1|subj)   [no age]
+
+M2_ml    <- lmer(y ~ time * sex + age + (1|subj), data = hip, REML = FALSE)
+M1_ml    <- lmer(y ~ time + sex + age + (1|subj), data = hip, REML = FALSE)
+M_noage  <- lmer(y ~ time * sex + (1|subj),       data = hip, REML = FALSE)
+
+# ── Test 1: Is time × sex interaction significant? ───────────────
+lrt_interaction <- anova(M1_ml, M2_ml)
+print(lrt_interaction)
+# H0: no interaction (M1) vs H1: interaction present (M2)
+# df difference = 2 (two extra interaction terms: time2:sex, time3:sex)
+
+# ── Test 2: Is age significant? ──────────────────────────────────
+lrt_age <- anova(M_noage, M2_ml)
+print(lrt_age)
+# H0: no age effect (M_noage) vs H1: age matters (M2_ml)
+# df difference = 1
+
+# ── Interpretation ────────────────────────────────────────────────
+cat("\n--- Interaction test ---\n")
+cat("Chi-squared =", round(lrt_interaction$Chisq[2], 3),
+    "df =", lrt_interaction$`Df`[2],
+    "p =", round(lrt_interaction$`Pr(>Chisq)`[2], 4), "\n")
+
+cat("\n--- Age test ---\n")
+cat("Chi-squared =", round(lrt_age$Chisq[2], 3),
+    "df =", lrt_age$`Df`[2],
+    "p =", round(lrt_age$`Pr(>Chisq)`[2], 4), "\n")</code></pre>
+
+          <p><strong>Notes on degrees of freedom:</strong></p>
+          <ul>
+            <li>
+              The interaction test has <strong>2 df</strong> because adding
+              <code>time * sex</code> introduces two extra parameters:
+              <code>time2:sexFemale</code> and <code>time3:sexFemale</code>
+              (time has 3 levels, so 2 dummy variables).
+            </li>
+            <li>
+              The age test has <strong>1 df</strong> (one additional parameter).
+            </li>
+            <li>
+              The LRT statistic $2[\ell(\hat{\boldsymbol{\theta}}_1) - \ell(\hat{\boldsymbol{\theta}}_0)]$
+              follows $\chi^2_{\Delta p}$ asymptotically under $H_0$, where $\Delta p$
+              is the difference in the number of parameters.
+            </li>
+          </ul>
+        </div>
+      </details>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="summary">Lab Summary</h2>
+
+      <div class="key-points">
+        <h4>What we learned from Lab 2</h4>
+        <ul>
+          <li>
+            <strong>Exploratory analysis</strong> is essential before modelling: individual
+            profile plots reveal the need for random effects far more clearly than any
+            formal test.
+          </li>
+          <li>
+            <strong>Use REML for estimation</strong> of variance components and fixed effects
+            in the final model; use <strong>ML for model comparison</strong> (AIC/BIC/LRT)
+            when fixed effects differ between models.
+          </li>
+          <li>
+            The <strong>ICC</strong> quantifies how much of the total variation is between
+            subjects. A high ICC (e.g. 0.7) means a random intercept captures most of the
+            clustering structure.
+          </li>
+          <li>
+            <strong>BLUPs shrink</strong> individual estimates toward the population mean.
+            With only one observation, the shrinkage factor equals the ICC. With many
+            observations, the BLUP converges to the OLS estimate.
+          </li>
+          <li>
+            Mixed models enable <strong>prediction for new subjects</strong> with partial
+            data by combining population-level estimates with subject-specific BLUPs.
+          </li>
+        </ul>
+      </div>
+
+      <div class="chapter-nav">
+        <a href="lab1.html">
+          <span class="nav-label">← Previous</span>
+          <span class="nav-title">Lab 1 — AIC &amp; BIC</span>
+        </a>
+        <a href="index.html" class="next">
+          <span class="nav-label">Back to start →</span>
+          <span class="nav-title">Introduction</span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+</body>
+</html>

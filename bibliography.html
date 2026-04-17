@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bibliography — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']] },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="bibliography">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Reference</span>
+        <span class="chapter-tag">Bibliography</span>
+      </div>
+
+      <h1 class="page-title">Bibliography</h1>
+      <p class="page-subtitle">Core references for the theory and methods in these notes</p>
+
+      <p>
+        The following references are organised by topic. Entries marked
+        <strong>[Essential]</strong> are the most important for following the course;
+        those marked <strong>[Further reading]</strong> go deeper into specific areas.
+      </p>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="model-selection">Model Selection</h2>
+
+      <dl>
+        <dt id="akaike1974">Akaike, H. (1974)</dt>
+        <dd>
+          A new look at the statistical model identification.
+          <em>IEEE Transactions on Automatic Control</em>, <strong>19</strong>(6), 716–723.
+          <span class="chapter-tag">AIC origin paper</span> <strong>[Essential]</strong>
+          <br>
+          <em>The foundational paper introducing AIC. Akaike derives the criterion from the perspective
+          of minimising the expected Kullback–Leibler divergence between the fitted model and the
+          truth. A landmark in the history of statistics.</em>
+        </dd>
+
+        <dt id="schwarz1978">Schwarz, G. (1978)</dt>
+        <dd>
+          Estimating the dimension of a model.
+          <em>The Annals of Statistics</em>, <strong>6</strong>(2), 461–464.
+          <span class="chapter-tag">BIC origin paper</span> <strong>[Essential]</strong>
+          <br>
+          <em>The original two-page derivation of BIC via Laplace approximation to the marginal
+          likelihood. Concise and elegant — worth reading in full.</em>
+        </dd>
+
+        <dt id="hurvich1989">Hurvich, C. M. and Tsai, C.-L. (1989)</dt>
+        <dd>
+          Regression and time series model selection in small samples.
+          <em>Biometrika</em>, <strong>76</strong>(2), 297–307.
+          <span class="chapter-tag">AICc</span>
+          <br>
+          <em>Derives the small-sample corrected AIC (AIC$_c$) for normal linear regression.</em>
+        </dd>
+
+        <dt id="takeuchi1976">Takeuchi, K. (1976)</dt>
+        <dd>
+          Distribution of informational statistics and a criterion of model fitting.
+          <em>Suri-Kagaku (Mathematical Sciences)</em>, <strong>153</strong>, 12–18. (In Japanese.)
+          <span class="chapter-tag">TIC</span>
+          <br>
+          <em>Introduces the TIC, which generalises AIC to the misspecified case by using the
+          sandwich correction $\mathrm{tr}(J^{-1}K)$ instead of $p$.</em>
+        </dd>
+
+        <dt id="burnham2002">Burnham, K. P. and Anderson, D. R. (2002)</dt>
+        <dd>
+          <em>Model Selection and Multimodel Inference: A Practical Information-Theoretic Approach</em>
+          (2nd edn.). Springer, New York.
+          <span class="chapter-tag">AIC in ecology</span> <strong>[Further reading]</strong>
+          <br>
+          <em>The definitive applied guide to AIC-based model selection. Heavy on practical guidance
+          and ecological applications.</em>
+        </dd>
+
+        <dt id="claeskens2008">Claeskens, G. and Hjort, N. L. (2008)</dt>
+        <dd>
+          <em>Model Selection and Model Averaging</em>. Cambridge University Press.
+          <span class="chapter-tag">Theory</span> <strong>[Further reading]</strong>
+          <br>
+          <em>A rigorous mathematical treatment of focused information criteria (FIC) and model
+          averaging. Excellent for understanding the asymptotic theory deeply.</em>
+        </dd>
+
+        <dt id="stone1977">Stone, M. (1977)</dt>
+        <dd>
+          An asymptotic equivalence of choice of model by cross-validation and Akaike's criterion.
+          <em>Journal of the Royal Statistical Society B</em>, <strong>39</strong>(1), 44–47.
+          <span class="chapter-tag">AIC = LOO-CV</span>
+          <br>
+          <em>Proves that AIC and leave-one-out cross-validation are asymptotically equivalent
+          for linear models — a beautiful connection.</em>
+        </dd>
+
+        <dt id="kass1995">Kass, R. E. and Raftery, A. E. (1995)</dt>
+        <dd>
+          Bayes factors.
+          <em>Journal of the American Statistical Association</em>, <strong>90</strong>(430), 773–795.
+          <span class="chapter-tag">Bayes factors</span> <strong>[Essential]</strong>
+          <br>
+          <em>The canonical reference on Bayes factors: definition, computation, interpretation
+          scale, and relationship to BIC. Highly readable.</em>
+        </dd>
+
+        <dt id="hoeting1999">Hoeting, J. A., Madigan, D., Raftery, A. E. and Volinsky, C. T. (1999)</dt>
+        <dd>
+          Bayesian model averaging: a tutorial.
+          <em>Statistical Science</em>, <strong>14</strong>(4), 382–401.
+          <span class="chapter-tag">Model averaging</span> <strong>[Further reading]</strong>
+        </dd>
+      </dl>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="glms">Generalised Linear Models</h2>
+
+      <dl>
+        <dt id="mccullagh1989">McCullagh, P. and Nelder, J. A. (1989)</dt>
+        <dd>
+          <em>Generalised Linear Models</em> (2nd edn.). Chapman and Hall, London.
+          <span class="chapter-tag">GLMs</span> <strong>[Essential]</strong>
+          <br>
+          <em>The definitive textbook on GLMs. Comprehensive treatment of exponential families,
+          link functions, IWLS, residuals, and model checking. A must-read for anyone working
+          seriously with regression models.</em>
+        </dd>
+
+        <dt id="wedderburn1974">Wedderburn, R. W. M. (1974)</dt>
+        <dd>
+          Quasi-likelihood functions, generalized linear models, and the Gauss–Newton method.
+          <em>Biometrika</em>, <strong>61</strong>(3), 439–447.
+          <span class="chapter-tag">Quasi-likelihood</span> <strong>[Essential]</strong>
+          <br>
+          <em>Introduces the quasi-likelihood framework, showing that valid inference only requires
+          a correct mean–variance specification, not a full distributional assumption.</em>
+        </dd>
+
+        <dt id="liang1986">Liang, K.-Y. and Zeger, S. L. (1986)</dt>
+        <dd>
+          Longitudinal data analysis using generalized linear models.
+          <em>Biometrika</em>, <strong>73</strong>(1), 13–22.
+          <span class="chapter-tag">GEE</span> <strong>[Essential]</strong>
+          <br>
+          <em>The original GEE paper. Proposes estimating equations for clustered/longitudinal data
+          with a working correlation matrix and sandwich variance estimator.</em>
+        </dd>
+      </dl>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="mixed-models">Mixed Models</h2>
+
+      <dl>
+        <dt id="laird1982">Laird, N. M. and Ware, J. H. (1982)</dt>
+        <dd>
+          Random-effects models for longitudinal data.
+          <em>Biometrics</em>, <strong>38</strong>(4), 963–974.
+          <span class="chapter-tag">LMM</span> <strong>[Essential]</strong>
+          <br>
+          <em>The landmark paper establishing the EM algorithm for fitting linear mixed models.
+          Defines the model, discusses REML, and gives the BLUP equations.</em>
+        </dd>
+
+        <dt id="pinheiro2000">Pinheiro, J. C. and Bates, D. M. (2000)</dt>
+        <dd>
+          <em>Mixed-Effects Models in S and S-PLUS</em>. Springer, New York.
+          <span class="chapter-tag">LMM / NLME / R</span> <strong>[Essential]</strong>
+          <br>
+          <em>The definitive practical guide to fitting mixed models in R using the
+          <code>nlme</code> package. Covers linear and nonlinear mixed models in depth,
+          with extensive real data examples.</em>
+        </dd>
+
+        <dt id="bates2015">Bates, D., Mächler, M., Bolker, B. and Walker, S. (2015)</dt>
+        <dd>
+          Fitting linear mixed-effects models using lme4.
+          <em>Journal of Statistical Software</em>, <strong>67</strong>(1), 1–48.
+          <span class="chapter-tag">lme4 / R</span> <strong>[Essential]</strong>
+          <br>
+          <em>The paper describing the <code>lme4</code> package. Explains the sparse matrix
+          methods, profiled likelihood, and REML implementation used by <code>lmer()</code>.</em>
+        </dd>
+
+        <dt id="goldstein2011">Goldstein, H. (2011)</dt>
+        <dd>
+          <em>Multilevel Statistical Models</em> (4th edn.). Wiley, Chichester.
+          <span class="chapter-tag">Multilevel models</span> <strong>[Further reading]</strong>
+        </dd>
+
+        <dt id="breslow1993">Breslow, N. E. and Clayton, D. G. (1993)</dt>
+        <dd>
+          Approximate inference in generalized linear mixed models.
+          <em>Journal of the American Statistical Association</em>, <strong>88</strong>(421), 9–25.
+          <span class="chapter-tag">GLMM / PQL / Laplace</span> <strong>[Essential]</strong>
+          <br>
+          <em>Introduces PQL and the Laplace approximation for GLMMs. Also shows that PQL
+          can be biased for binary responses with small cluster sizes.</em>
+        </dd>
+
+        <dt id="liu1994">Liu, Q. and Pierce, D. A. (1994)</dt>
+        <dd>
+          A note on Gauss–Hermite quadrature.
+          <em>Biometrika</em>, <strong>81</strong>(3), 624–629.
+          <span class="chapter-tag">Quadrature for GLMMs</span>
+        </dd>
+      </dl>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="nonlinear-refs">Nonlinear Models</h2>
+
+      <dl>
+        <dt id="seber2003">Seber, G. A. F. and Wild, C. J. (2003)</dt>
+        <dd>
+          <em>Nonlinear Regression</em>. Wiley-Interscience, Hoboken, NJ.
+          <span class="chapter-tag">NLS theory</span> <strong>[Essential]</strong>
+          <br>
+          <em>Comprehensive treatment of nonlinear least squares — estimation, inference, diagnostics,
+          profile likelihood intervals, and many worked examples.</em>
+        </dd>
+
+        <dt id="lindstrom1990">Lindstrom, M. J. and Bates, D. M. (1990)</dt>
+        <dd>
+          Nonlinear mixed effects models for repeated measures data.
+          <em>Biometrics</em>, <strong>46</strong>(3), 673–687.
+          <span class="chapter-tag">NLME</span> <strong>[Essential]</strong>
+          <br>
+          <em>Proposes and analyses the nonlinear mixed effects model using Laplace approximation
+          for the marginal likelihood.</em>
+        </dd>
+
+        <dt id="davidian1995">Davidian, M. and Giltinan, D. M. (1995)</dt>
+        <dd>
+          <em>Nonlinear Models for Repeated Measurement Data</em>. Chapman and Hall, London.
+          <span class="chapter-tag">NLME applications</span> <strong>[Further reading]</strong>
+          <br>
+          <em>Focuses on pharmacokinetic and biological applications of nonlinear mixed models.
+          Excellent for practitioners.</em>
+        </dd>
+      </dl>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="latent-refs">Latent Variables and the EM Algorithm</h2>
+
+      <dl>
+        <dt id="dempster1977">Dempster, A. P., Laird, N. M. and Rubin, D. B. (1977)</dt>
+        <dd>
+          Maximum likelihood from incomplete data via the EM algorithm.
+          <em>Journal of the Royal Statistical Society B</em>, <strong>39</strong>(1), 1–38.
+          <span class="chapter-tag">EM algorithm</span> <strong>[Essential]</strong>
+          <br>
+          <em>The original EM paper — one of the most cited papers in the history of statistics.
+          Introduces the E and M steps, proves monotone ascent, discusses convergence, and
+          applies EM to a wide range of problems.</em>
+        </dd>
+
+        <dt id="mclachlan2007">McLachlan, G. J. and Krishnan, T. (2007)</dt>
+        <dd>
+          <em>The EM Algorithm and Extensions</em> (2nd edn.). Wiley, New York.
+          <span class="chapter-tag">EM — comprehensive</span> <strong>[Essential]</strong>
+          <br>
+          <em>The most complete treatment of EM available. Covers convergence theory, extensions
+          (ECM, ECME, MCEM), and hundreds of applications.</em>
+        </dd>
+
+        <dt id="mclachlan2000">McLachlan, G. J. and Peel, D. (2000)</dt>
+        <dd>
+          <em>Finite Mixture Models</em>. Wiley, New York.
+          <span class="chapter-tag">Mixture models</span> <strong>[Essential]</strong>
+          <br>
+          <em>Definitive reference on mixture models — identifiability, EM, model selection
+          for $K$, extensions to mixtures of regressions and hidden Markov models.</em>
+        </dd>
+
+        <dt id="fraley2002">Fraley, C. and Raftery, A. E. (2002)</dt>
+        <dd>
+          Model-based clustering, discriminant analysis, and density estimation.
+          <em>Journal of the American Statistical Association</em>, <strong>97</strong>(458), 611–631.
+          <span class="chapter-tag">mclust / BIC for K</span> <strong>[Essential]</strong>
+          <br>
+          <em>Describes the <code>mclust</code> R package methodology: model-based clustering
+          with a rich family of Gaussian mixture covariance structures, using BIC for model
+          selection.</em>
+        </dd>
+
+        <dt id="tanner1987">Tanner, M. A. and Wong, W. H. (1987)</dt>
+        <dd>
+          The calculation of posterior distributions by data augmentation.
+          <em>Journal of the American Statistical Association</em>, <strong>82</strong>(398), 528–540.
+          <span class="chapter-tag">Data augmentation</span> <strong>[Further reading]</strong>
+          <br>
+          <em>Introduces data augmentation as a general technique for Bayesian computation
+          with latent variables, foreshadowing the MCMC revolution.</em>
+        </dd>
+
+        <dt id="roeder1990">Roeder, K. (1990)</dt>
+        <dd>
+          Density estimation with confidence sets exemplified by superclusters and voids in the galaxies.
+          <em>Journal of the American Statistical Association</em>, <strong>85</strong>(411), 617–624.
+          <span class="chapter-tag">Galaxy data</span>
+          <br>
+          <em>Source of the famous <code>galaxies</code> dataset used throughout Chapter 4.</em>
+        </dd>
+      </dl>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="bayesian-refs">Bayesian Inference</h2>
+
+      <dl>
+        <dt id="gelman2013">Gelman, A., Carlin, J. B., Stern, H. S., Dunson, D. B., Vehtari, A. and Rubin, D. B. (2013)</dt>
+        <dd>
+          <em>Bayesian Data Analysis</em> (3rd edn.). CRC Press, Boca Raton.
+          <span class="chapter-tag">Bayesian</span> <strong>[Essential]</strong>
+          <br>
+          <em>The standard graduate-level Bayesian textbook. Covers hierarchical models, MCMC,
+          model checking, and much more. Freely available online.</em>
+        </dd>
+
+        <dt id="berger1985">Berger, J. O. (1985)</dt>
+        <dd>
+          <em>Statistical Decision Theory and Bayesian Analysis</em> (2nd edn.). Springer, New York.
+          <span class="chapter-tag">Decision theory / Bayes</span> <strong>[Further reading]</strong>
+        </dd>
+      </dl>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="computation-refs">Computation and Software</h2>
+
+      <dl>
+        <dt id="rcore">R Core Team (2024)</dt>
+        <dd>
+          <em>R: A Language and Environment for Statistical Computing</em>.
+          R Foundation for Statistical Computing, Vienna, Austria.
+          <a href="https://www.R-project.org/" target="_blank">https://www.R-project.org/</a>
+        </dd>
+
+        <dt id="venables2002">Venables, W. N. and Ripley, B. D. (2002)</dt>
+        <dd>
+          <em>Modern Applied Statistics with S</em> (4th edn.). Springer, New York.
+          <span class="chapter-tag">MASS / R</span> <strong>[Essential]</strong>
+          <br>
+          <em>Companion to the <code>MASS</code> R package. Covers GLMs, robust methods,
+          survival analysis, multivariate methods, and more.</em>
+        </dd>
+      </dl>
+
+      <div class="chapter-nav">
+        <a href="latent.html">
+          <span class="nav-label">← Previous</span>
+          <span class="nav-title">4 — Latent Variables</span>
+        </a>
+        <a href="lab1.html" class="next">
+          <span class="nav-label">Next →</span>
+          <span class="nav-title">Lab 1 — AIC &amp; BIC in Practice</span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="css/nav.js"></script>
+</body>
+</html>

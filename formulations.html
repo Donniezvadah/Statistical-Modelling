@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Model Formulations — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams',
+        macros: {
+          bbeta:'\\boldsymbol{\\beta}', btheta:'\\boldsymbol{\\theta}',
+          bmu:'\\boldsymbol{\\mu}',     bSigma:'\\boldsymbol{\\Sigma}',
+          bb:'\\mathbf{b}',             bx:'\\mathbf{x}',
+          bX:'\\mathbf{X}',             bZ:'\\mathbf{Z}',
+          bY:'\\mathbf{Y}',             by:'\\mathbf{y}',
+          E:'\\mathbb{E}',              Var:'\\mathrm{Var}',
+          Cov:'\\mathrm{Cov}',          N:'\\mathrm{N}'
+        }
+      },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+  <style>
+    /* ── Extra styles for this reference card ── */
+    .model-card {
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem 1.75rem;
+      margin: 1.5rem 0;
+      background: var(--bg-body);
+      position: relative;
+    }
+    .model-card:hover { box-shadow: var(--shadow-md); }
+    .model-card-header {
+      display: flex; align-items: flex-start; gap: 1rem;
+      margin-bottom: 1.1rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.75rem;
+    }
+    .model-icon {
+      font-size: 1.5rem; line-height: 1;
+      min-width: 2rem; text-align: center;
+    }
+    .model-name { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0; }
+    .model-abbr { font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-mono); }
+    .model-chapter { margin-left: auto; }
+
+    .model-grid {
+      display: grid; grid-template-columns: 140px 1fr;
+      gap: 0.5rem 1rem; font-size: 0.88rem;
+    }
+    .mg-label { font-weight: 600; color: var(--text-secondary); padding-top: 0.1rem; }
+    .mg-value { color: var(--text-primary); }
+
+    .param-table { margin: 0.75rem 0; }
+    .param-table th { font-size: 0.8rem; padding: 0.4rem 0.75rem; }
+    .param-table td { font-size: 0.83rem; padding: 0.35rem 0.75rem; }
+
+    .complexity-bar {
+      display: flex; gap: 3px; align-items: center; margin-top: 0.25rem;
+    }
+    .complexity-pip {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--border-color);
+    }
+    .complexity-pip.filled { background: var(--color-primary); }
+
+    .tag-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+    .model-tag {
+      font-size: 0.72rem; padding: 0.15rem 0.55rem;
+      border: 1px solid var(--border-color);
+      border-radius: 99px; color: var(--text-muted);
+      background: var(--bg-code);
+    }
+
+    .filter-bar {
+      display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem;
+    }
+    .filter-btn {
+      background: var(--bg-code); border: 1px solid var(--border-color);
+      border-radius: 99px; padding: 0.3rem 0.85rem;
+      font-size: 0.8rem; cursor: pointer; color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+    .filter-btn.active,
+    .filter-btn:hover {
+      background: var(--color-primary); border-color: var(--color-primary);
+      color: white;
+    }
+
+    @media (max-width: 600px) {
+      .model-grid { grid-template-columns: 1fr; }
+      .mg-label { color: var(--color-primary); margin-top: 0.5rem; }
+    }
+  </style>
+</head>
+<body data-page="formulations">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Reference</span>
+        <span class="chapter-tag">Model Formulations</span>
+        <span class="chapter-tag">Quick Reference Card</span>
+      </div>
+
+      <h1 class="page-title">Model Formulations</h1>
+      <p class="page-subtitle">
+        Every model in the course — fully specified, with parameters, assumptions,
+        estimation methods, and when to use each one
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">📋 How to use this reference card</div>
+        <p>
+          Each card gives the complete mathematical formulation, parameter table,
+          assumptions, estimation approach, and diagnostics for one model class.
+          Use the filter buttons to show only the models relevant to a particular
+          chapter or data type. Click <strong>Save PDF</strong> at the top to
+          download a clean printable version.
+        </p>
+      </div>
+
+      <!-- ── Filter bar ──────────────────────────────────────── -->
+      <div class="filter-bar" id="filter-bar">
+        <button class="filter-btn active" data-filter="all">All models</button>
+        <button class="filter-btn" data-filter="ch1">Ch 1 — Selection</button>
+        <button class="filter-btn" data-filter="ch2">Ch 2 — Beyond GLMs</button>
+        <button class="filter-btn" data-filter="ch3">Ch 3 — Nonlinear</button>
+        <button class="filter-btn" data-filter="ch4">Ch 4 — Latent Vars</button>
+        <button class="filter-btn" data-filter="normal">Normal response</button>
+        <button class="filter-btn" data-filter="binary">Binary response</button>
+        <button class="filter-btn" data-filter="count">Count response</button>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="lm">The Foundation Models</h2>
+
+      <!-- ── LM ── -->
+      <div class="model-card" data-tags="ch1 ch2 normal">
+        <div class="model-card-header">
+          <div class="model-icon">📐</div>
+          <div>
+            <div class="model-name">Linear Model</div>
+            <div class="model-abbr">LM</div>
+          </div>
+          <span class="model-chapter"><span class="chapter-tag">Foundation</span></span>
+        </div>
+
+        <div class="model-grid">
+          <div class="mg-label">Model</div>
+          <div class="mg-value">
+            $$Y_i = \mathbf{x}_i^\top \boldsymbol{\beta} + \varepsilon_i, \qquad \varepsilon_i \overset{\mathrm{iid}}{\sim} \mathrm{N}(0,\sigma^2)$$
+          </div>
+
+          <div class="mg-label">Equivalent form</div>
+          <div class="mg-value">$\mathbf{Y} \sim \mathrm{N}(\mathbf{X}\boldsymbol{\beta},\, \sigma^2 \mathbf{I}_n)$</div>
+
+          <div class="mg-label">Link function</div>
+          <div class="mg-value">Identity: $g(\mu) = \mu$</div>
+
+          <div class="mg-label">Estimation</div>
+          <div class="mg-value">OLS / MLE: $\hat{\boldsymbol{\beta}} = (\mathbf{X}^\top\mathbf{X})^{-1}\mathbf{X}^\top\mathbf{y}$</div>
+
+          <div class="mg-label">Residual var.</div>
+          <div class="mg-value">$\hat{\sigma}^2 = \|\mathbf{y} - \mathbf{X}\hat{\boldsymbol{\beta}}\|^2 / (n-p)$</div>
+
+          <div class="mg-label">Inference</div>
+          <div class="mg-value">Exact $t$ and $F$ tests; confidence intervals $\hat{\beta}_j \pm t_{n-p,\alpha/2}\,\mathrm{se}(\hat{\beta}_j)$</div>
+
+          <div class="mg-label">Assumptions</div>
+          <div class="mg-value">Linearity, homoscedasticity, normality, independence of errors</div>
+
+          <div class="mg-label">Diagnostics</div>
+          <div class="mg-value">Residuals vs fitted; Q–Q plot; Scale-location; Cook's distance; <code>plot(lm(...))</code></div>
+
+          <div class="mg-label">R function</div>
+          <div class="mg-value"><code>lm(y ~ x1 + x2, data = df)</code></div>
+
+          <div class="mg-label">Complexity</div>
+          <div class="mg-value">
+            <div class="complexity-bar">
+              <div class="complexity-pip filled"></div><div class="complexity-pip"></div>
+              <div class="complexity-pip"></div><div class="complexity-pip"></div>
+              <div class="complexity-pip"></div>&nbsp;1 / 5
+            </div>
+          </div>
+        </div>
+
+        <div class="tag-row">
+          <span class="model-tag">Normal response</span>
+          <span class="model-tag">Continuous X</span>
+          <span class="model-tag">Closed-form MLE</span>
+          <span class="model-tag">Exact inference</span>
+        </div>
+      </div>
+
+      <!-- ── GLM ── -->
+      <div class="model-card" data-tags="ch1 ch2 normal binary count">
+        <div class="model-card-header">
+          <div class="model-icon">🔗</div>
+          <div>
+            <div class="model-name">Generalised Linear Model</div>
+            <div class="model-abbr">GLM</div>
+          </div>
+          <span class="model-chapter"><span class="chapter-tag">Foundation</span></span>
+        </div>
+
+        <div class="model-grid">
+          <div class="mg-label">Three components</div>
+          <div class="mg-value">
+            <ol style="margin:0;padding-left:1.2rem;">
+              <li><strong>Random:</strong> $Y_i \mid \mathbf{x}_i \sim \mathrm{EF}(\mu_i,\phi)$ — exponential family</li>
+              <li><strong>Systematic:</strong> $\eta_i = \mathbf{x}_i^\top\boldsymbol{\beta}$ — linear predictor</li>
+              <li><strong>Link:</strong> $g(\mu_i) = \eta_i$ — connects mean to predictor</li>
+            </ol>
+          </div>
+
+          <div class="mg-label">EF density</div>
+          <div class="mg-value">$f(y_i;\theta_i,\phi) = \exp\!\left\{\frac{y_i\theta_i - b(\theta_i)}{a(\phi)} + c(y_i,\phi)\right\}$</div>
+
+          <div class="mg-label">Mean &amp; variance</div>
+          <div class="mg-value">$\mu_i = b'(\theta_i)$;&nbsp;&nbsp; $\mathrm{Var}(Y_i) = a(\phi)\,b''(\theta_i)$</div>
+
+          <div class="mg-label">Common cases</div>
+          <div class="mg-value">
+            <div class="table-wrapper"><table class="param-table">
+              <thead><tr><th>Distribution</th><th>Link</th><th>$V(\mu)$</th><th>Use</th></tr></thead>
+              <tbody>
+                <tr><td>Normal</td><td>Identity</td><td>$1$</td><td>Continuous</td></tr>
+                <tr><td>Binomial</td><td>Logit</td><td>$\mu(1{-}\mu)$</td><td>Binary / proportion</td></tr>
+                <tr><td>Poisson</td><td>Log</td><td>$\mu$</td><td>Counts</td></tr>
+                <tr><td>Gamma</td><td>Log / Inverse</td><td>$\mu^2$</td><td>Positive continuous</td></tr>
+                <tr><td>Inv-Gaussian</td><td>$1/\mu^2$</td><td>$\mu^3$</td><td>Positive, right-skewed</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+
+          <div class="mg-label">Estimation</div>
+          <div class="mg-value">Iteratively Reweighted Least Squares (IWLS); equivalent to Newton–Raphson on log-likelihood</div>
+
+          <div class="mg-label">Score equation</div>
+          <div class="mg-value">$\mathbf{X}^\top \mathbf{W}^{1/2}\mathbf{z} = \mathbf{0}$ where $z_i = \eta_i + (y_i-\mu_i)g'(\mu_i)$, $w_i = [V(\mu_i)g'(\mu_i)^2]^{-1}$</div>
+
+          <div class="mg-label">Deviance</div>
+          <div class="mg-value">$D = 2[\ell(\text{saturated}) - \ell(\hat{\boldsymbol{\beta}})]$; under correct model $D \approx \chi^2_{n-p}$</div>
+
+          <div class="mg-label">R function</div>
+          <div class="mg-value"><code>glm(y ~ x, family = binomial(link="logit"))</code></div>
+
+          <div class="mg-label">Complexity</div>
+          <div class="mg-value">
+            <div class="complexity-bar">
+              <div class="complexity-pip filled"></div><div class="complexity-pip filled"></div>
+              <div class="complexity-pip"></div><div class="complexity-pip"></div>
+              <div class="complexity-pip"></div>&nbsp;2 / 5
+            </div>
+          </div>
+        </div>
+
+        <div class="tag-row">
+          <span class="model-tag">Exponential family</span>
+          <span class="model-tag">Link function</span>
+          <span class="model-tag">IWLS</span>
+          <span class="model-tag">Deviance tests</span>
+          <span class="model-tag">Chapter 2 baseline</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="overdispersion-models">Overdispersion Models</h2>
+
+      <!-- ── Quasi-likelihood ── -->
+      <div class="model-card" data-tags="ch2 binary count">
+        <div class="model-card-header">
+          <div class="model-icon">〜</div>
+          <div>
+            <div class="model-name">Quasi-Likelihood Model</div>
+            <div class="model-abbr">Quasi-GLM</div>
+          </div>
+          <span class="model-chapter"><span class="chapter-tag">Chapter 2 — §2.2</span></span>
+        </div>
+
+        <div class="model-grid">
+          <div class="mg-label">Specification</div>
+          <div class="mg-value">Only first two moments: $\E[Y_i|\mathbf{x}_i] = \mu_i$, &nbsp;$\Var(Y_i|\mathbf{x}_i) = \phi\, V(\mu_i)/m_i$</div>
+
+          <div class="mg-label">Quasi-score</div>
+          <div class="mg-value">$$U(\boldsymbol{\beta}) = \sum_{i=1}^n \frac{(y_i - \mu_i)}{\phi V(\mu_i)/m_i} \cdot \frac{\partial\mu_i}{\partial\boldsymbol{\beta}} = \mathbf{0}$$</div>
+
+          <div class="mg-label">Dispersion est.</div>
+          <div class="mg-value">$\hat{\phi} = \frac{1}{n-p}\sum_{i=1}^n \frac{(y_i-\hat\mu_i)^2}{V(\hat\mu_i)/m_i}$ &nbsp;&nbsp;(Pearson chi-squared / df)</div>
+
+          <div class="mg-label">SE adjustment</div>
+          <div class="mg-value">All standard errors multiplied by $\sqrt{\hat\phi}$; $t$-tests use $t_{n-p}$ distribution</div>
+
+          <div class="mg-label">When to use</div>
+          <div class="mg-value">Residual deviance / df $> 1.5$; model otherwise correct; no fully specified parametric alternative available</div>
+
+          <div class="mg-label">Limitation</div>
+          <div class="mg-value">No log-likelihood → AIC undefined; use quasi-AIC or QBIC for model selection</div>
+
+          <div class="mg-label">R function</div>
+          <div class="mg-value"><code>glm(y ~ x, family = quasipoisson)</code> or <code>quasibinomial</code></div>
+
+          <div class="mg-label">Complexity</div>
+          <div class="mg-value">
+            <div class="complexity-bar">
+              <div class="complexity-pip filled"></div><div class="complexity-pip filled"></div>
+              <div class="complexity-pip"></div><div class="complexity-pip"></div>
+              <div class="complexity-pip"></div>&nbsp;2 / 5
+            </div>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="model-tag">Mean-variance only</span>
+          <span class="model-tag">No full likelihood</span>
+          <span class="model-tag">Robust SE</span>
+          <span class="model-tag">Overdispersion</span>
+        </div>
+      </div>
+
+      <!-- ── Negative Binomial ── -->
+      <div class="model-card" data-tags="ch2 count">
+        <div class="model-card-header">
+          <div class="model-icon">📊</div>
+          <div>
+            <div class="model-name">Negative Binomial Regression</div>
+            <div class="model-abbr">NB-GLM</div>
+          </div>
+          <span class="model-chapter"><span class="chapter-tag">Chapter 2 — §2.2</span></span>
+        </div>
+
+        <div class="model-grid">
+          <div class="mg-label">Latent structure</div>
+          <div class="mg-value">$U_i \sim \mathrm{Gamma}(\nu, \nu/\mu_i)$, &nbsp;$Y_i|U_i \sim \mathrm{Poisson}(U_i)$</div>
+
+          <div class="mg-label">Marginal pmf</div>
+          <div class="mg-value">$P(Y_i=y) = \binom{y+\nu-1}{y}\!\left(\frac{\nu}{\nu+\mu_i}\right)^\nu\!\left(\frac{\mu_i}{\nu+\mu_i}\right)^y$</div>
+
+          <div class="mg-label">Mean &amp; variance</div>
+          <div class="mg-value">$\E[Y_i] = \mu_i$;&nbsp;&nbsp; $\Var(Y_i) = \mu_i + \mu_i^2/\nu$</div>
+
+          <div class="mg-label">Link function</div>
+          <div class="mg-value">Log: $\log\mu_i = \mathbf{x}_i^\top\boldsymbol{\beta}$</div>
+
+          <div class="mg-label">Overdispersion</div>
+          <div class="mg-value">$\phi = 1 + \mu_i/\nu$; as $\nu\to\infty$, Poisson recovered</div>
+
+          <div class="mg-label">Estimation</div>
+          <div class="mg-value">Profile MLE or EM (treat $U_i$ as latent; see Chapter 4, Example 4.3)</div>
+
+          <div class="mg-label">R function</div>
+          <div class="mg-value"><code>MASS::glm.nb(y ~ x, data = df)</code></div>
+
+          <div class="mg-label">Complexity</div>
+          <div class="mg-value">
+            <div class="complexity-bar">
+              <div class="complexity-pip filled"></div><div class="complexity-pip filled"></div>
+              <div class="complexity-pip filled"></div><div class="complexity-pip"></div>
+              <div class="complexity-pip"></div>&nbsp;3 / 5
+            </div>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="model-tag">Count data</span>
+          <span class="model-tag">Overdispersion</span>
+          <span class="model-tag">Poisson–Gamma mixture</span>
+          <span class="model-tag">Full likelihood</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="mixed-model-cards">Mixed Models</h2>
+
+      <!-- ── LMM ── -->
+      <div class="model-card" data-tags="ch2 normal">
+        <div class="model-card-header">
+          <div class="model-icon">🔀</div>
+          <div>
+            <div class="model-name">Linear Mixed Model</div>
+            <div class="model-abbr">LMM</div>
+          </div>
+          <span class="model-chapter"><span class="chapter-tag">Chapter 2 — §2.4</span></span>
+        </div>
+
+        <div class="model-grid">
+          <div class="mg-label">Model</div>
+          <div class="mg-value">$$\mathbf{Y}_i = \mathbf{X}_i\boldsymbol{\beta} + \mathbf{Z}_i\mathbf{b}_i + \boldsymbol{\varepsilon}_i$$</div>
+
+          <div class="mg-label">Distributions</div>
+          <div class="mg-value">$\mathbf{b}_i \sim \N(\mathbf{0}, \boldsymbol{\Sigma}_b)$;&nbsp; $\boldsymbol{\varepsilon}_i \sim \N(\mathbf{0}, \sigma^2\mathbf{I}_{n_i})$;&nbsp; $\mathbf{b}_i \perp \boldsymbol{\varepsilon}_i$</div>
+
+          <div class="mg-label">Marginal dist.</div>
+          <div class="mg-value">$\mathbf{Y}_i \sim \N\!\left(\mathbf{X}_i\boldsymbol{\beta},\; \underbrace{\mathbf{Z}_i\boldsymbol{\Sigma}_b\mathbf{Z}_i^\top + \sigma^2\mathbf{I}}_{\boldsymbol{\Sigma}_i}\right)$</div>
+
+          <div class="mg-label">Fixed effects</div>
+          <div class="mg-value">$\boldsymbol{\beta}$ — population-level parameters (GLS estimator)</div>
+
+          <div class="mg-label">Random effects</div>
+          <div class="mg-value">$\mathbf{b}_i$ — cluster-specific deviations (predicted by BLUP)</div>
+
+          <div class="mg-label">BLUP</div>
+          <div class="mg-value">$\hat{\mathbf{b}}_i = \boldsymbol{\Sigma}_b\mathbf{Z}_i^\top\boldsymbol{\Sigma}_i^{-1}(\mathbf{y}_i - \mathbf{X}_i\hat{\boldsymbol{\beta}})$</div>
+
+          <div class="mg-label">ICC</div>
+          <div class="mg-value">$\rho = \sigma_b^2/(\sigma_b^2 + \sigma^2)$ (random intercept model)</div>
+
+          <div class="mg-label">Estimation</div>
+          <div class="mg-value">REML for variance components; ML for fixed-effect model comparison</div>
+
+          <div class="mg-label">Model comparison</div>
+          <div class="mg-value">Use ML + AIC/BIC/LRT for fixed effects; use REML + LRT for random effects</div>
+
+          <div class="mg-label">R function</div>
+          <div class="mg-value"><code>lme4::lmer(y ~ x + (1|subj))</code></div>
+
+          <div class="mg-label">Complexity</div>
+          <div class="mg-value">
+            <div class="complexity-bar">
+              <div class="complexity-pip filled"></div><div class="complexity-pip filled"></div>
+              <div class="complexity-pip filled"></div><div class="complexity-pip"></div>
+              <div class="complexity-pip"></div>&nbsp;3 / 5
+            </div>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="model-tag">Clustered data</span>
+          <span class="model-tag">REML</span>
+          <span class="model-tag">BLUP / shrinkage</span>
+          <span class="model-tag">Hierarchical</span>
+          <span class="model-tag">Normal response</span>
+        </div>
+      </div>
+
+      <!-- ── GLMM ── -->
+      <div class="model-card" data-tags="ch2 binary count">
+        <div class="model-card-header">
+          <div class="model-icon">🔗🔀</div>
+          <div>
+            <div class="model-name">Generalised Linear Mixed Model</div>
+            <div class="model-abbr">GLMM</div>
+          </div>
+          <span class="model-chapter"><span class="chapter-tag">Chapter 2 — §2.5</span></span>
+        </div>
+
+        <div class="model-grid">
+          <div class="mg-label">Conditional model</div>
+          <div class="mg-value">$$Y_{ij}|\mathbf{b}_i \sim \mathrm{EF}(\mu_{ij},\phi), \quad g(\mu_{ij}) = \mathbf{x}_{ij}^\top\boldsymbol{\beta} + \mathbf{z}_{ij}^\top\mathbf{b}_i$$</div>
+
+          <div class="mg-label">Random effects</div>
+          <div class="mg-value">$\mathbf{b}_i \overset{\mathrm{iid}}{\sim} \N(\mathbf{0}, \boldsymbol{\Sigma}_b)$</div>
+
+          <div class="mg-label">Marginal likelihood</div>
+          <div class="mg-value">$\ell = \sum_i \log\int f(\mathbf{y}_i|\mathbf{b}_i)\,\phi(\mathbf{b}_i;\boldsymbol{\Sigma}_b)\,d\mathbf{b}_i$ &nbsp;— no closed form for non-normal responses</div>
+
+          <div class="mg-label">Approximations</div>
+          <div class="mg-value">
+            <ul style="margin:0;padding-left:1.2rem;">
+              <li><strong>GHQ:</strong> Gauss–Hermite quadrature with $Q$ nodes (accurate, slow for high-dim $\mathbf{b}$)</li>
+              <li><strong>Laplace:</strong> 2nd-order Taylor at posterior mode (fast, slightly less accurate)</li>
+              <li><strong>PQL:</strong> Penalised quasi-likelihood (fast but biased — avoid for binary data)</li>
+            </ul>
+          </div>
+
+          <div class="mg-label">Fixed vs. marginal</div>
+          <div class="mg-value">$\boldsymbol{\beta}$ = <em>subject-specific</em> effect (not population-averaged; different from GEE)</div>
+
+          <div class="mg-label">R function</div>
+          <div class="mg-value"><code>lme4::glmer(y ~ x + (1|id), family=binomial, nAGQ=25)</code></div>
+
+          <div class="mg-label">Complexity</div>
+          <div class="mg-value">
+            <div class="complexity-bar">
+              <div class="complexity-pip filled"></div><div class="complexity-pip filled"></div>
+              <div class="complexity-pip filled"></div><div class="complexity-pip filled"></div>
+              <div class="complexity-pip"></div>&nbsp;4 / 5
+            </div>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="model-tag">Non-normal response</span>
+          <span class="model-tag">Clustered data</span>
+          <span class="model-tag">Quadrature / Laplace</span>
+          <span class="model-tag">Subject-specific effects</span>
+        </div>
+      </div>
+
+      <!-- ── GEE ── -->
+      <div class="model-card" data-tags="ch2 binary count normal">
+        <div class="model-card-header">
+          <div class="model-icon">⟺</div>
+          <div>
+            <div class="model-name">Generalised Estimating Equations</div>
+            <div class="model-abbr">GEE</div>
+          </div>
+          <span class="model-chapter"><span class="chapter-tag">Chapter 2 — §2.3</span></span>
+        </div>
+
+        <div class="model-grid">
+          <div class="mg-label">Model</div>
+          <div class="mg-value">$\E[Y_{ij}] = \mu_{ij}$, &nbsp;$g(\mu_{ij}) = \mathbf{x}_{ij}^\top\boldsymbol{\beta}$, &nbsp;$\Var(Y_{ij}) = \phi V(\mu_{ij})/w_{ij}$</div>
+
+          <div class="mg-label">Working corr.</div>
+          <div class="mg-value">$\mathrm{Cor}(Y_{ij},Y_{ik}) = R_{jk}(\boldsymbol{\alpha})$ — specified but need not be correct</div>
+
+          <div class="mg-label">Estimating eqs</div>
+          <div class="mg-value">$\sum_i \mathbf{D}_i^\top \mathbf{V}_i^{-1}(\mathbf{y}_i - \boldsymbol{\mu}_i) = \mathbf{0}$</div>
+
+          <div class="mg-label">Sandwich SE</div>
+          <div class="mg-value">$\hat{\mathbf{V}}(\hat{\boldsymbol{\beta}}) = \mathbf{A}^{-1}\mathbf{B}\mathbf{A}^{-1}$ — valid even if $\mathbf{R}$ is wrong</div>
+
+          <div class="mg-label">Interpretation</div>
+          <div class="mg-value"><em>Population-averaged</em> effect (different from GLMM subject-specific)</div>
+
+          <div class="mg-label">Working correlations</div>
+          <div class="mg-value">Independence · Exchangeable · AR(1) · Unstructured</div>
+
+          <div class="mg-label">R function</div>
+          <div class="mg-value"><code>gee::gee()</code> or <code>geepack::geeglm()</code></div>
+
+          <div class="mg-label">Complexity</div>
+          <div class="mg-value">
+            <div class="complexity-bar">
+              <div class="complexity-pip filled"></div><div class="complexity-pip filled"></div>
+              <div class="complexity-pip filled"></div><div class="complexity-pip"></div>
+              <div class="complexity-pip"></div>&nbsp;3 / 5
+            </div>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="model-tag">Population-averaged</span>
+          <span class="model-tag">Robust inference</span>
+          <span class="model-tag">Any response type</span>
+          <span class="model-tag">Longitudinal</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="nonlinear-cards">Nonlinear Models</h2>
+
+      <!-- ── NLS ── -->
+      <div class="model-card" data-tags="ch3 normal">
+        <div class="model-card-header">
+          <div class="model-icon">〰️</div>
+          <div>
+            <div class="model-name">Nonlinear Least Squares</div>
+            <div class="model-abbr">NLS</div>
+          </div>
+          <span class="model-chapter"><span class="chapter-tag">Chapter 3 — §3.2</span></span>
+        </div>
+
+        <div class="model-grid">
+          <div class="mg-label">Model</div>
+          <div class="mg-value">$$Y_i = \eta(x_i,\boldsymbol{\beta}) + \varepsilon_i, \quad \varepsilon_i \overset{\mathrm{iid}}{\sim} \N(0,\sigma^2)$$</div>
+
+          <div class="mg-label">Estimation</div>
+          <div class="mg-value">Minimise $S(\boldsymbol{\beta}) = \sum(y_i - \eta(x_i,\boldsymbol{\beta}))^2$ — iterative (Gauss–Newton)</div>
+
+          <div class="mg-label">Gauss–Newton step</div>
+          <div class="mg-value">$\boldsymbol{\beta}^{(t+1)} = \boldsymbol{\beta}^{(t)} + (\mathbf{J}^{(t)\top}\mathbf{J}^{(t)})^{-1}\mathbf{J}^{(t)\top}\mathbf{r}^{(t)}$</div>
+
+          <div class="mg-label">Jacobian</div>
+          <div class="mg-value">$J_{ij} = \partial\eta(x_i,\boldsymbol{\beta})/\partial\beta_j$ — $n\times p$ matrix of partial derivatives</div>
+
+          <div class="mg-label">Asymptotic cov.</div>
+          <div class="mg-value">$\widehat{\Var}(\hat{\boldsymbol{\beta}}) = \hat\sigma^2(\hat{\mathbf{J}}^\top\hat{\mathbf{J}})^{-1}$</div>
+
+          <div class="mg-label">Confidence int.</div>
+          <div class="mg-value">Profile likelihood CIs preferred over Wald CIs for skewed sampling distributions</div>
+
+          <div class="mg-label">Key caution</div>
+          <div class="mg-value">Requires good starting values; may converge to local minimum; always check with multiple starts</div>
+
+          <div class="mg-label">R function</div>
+          <div class="mg-value"><code>nls(y ~ eta(x, b0, b1), start=list(b0=..., b1=...))</code></div>
+
+          <div class="mg-label">Complexity</div>
+          <div class="mg-value">
+            <div class="complexity-bar">
+              <div class="complexity-pip filled"></div><div class="complexity-pip filled"></div>
+              <div class="complexity-pip filled"></div><div class="complexity-pip"></div>
+              <div class="complexity-pip"></div>&nbsp;3 / 5
+            </div>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="model-tag">Mechanistic models</span>
+          <span class="model-tag">Physical parameters</span>
+          <span class="model-tag">Gauss–Newton</span>
+          <span class="model-tag">Profile likelihood CI</span>
+        </div>
+      </div>
+
+      <!-- ── NLME ── -->
+      <div class="model-card" data-tags="ch3 normal">
+        <div class="model-card-header">
+          <div class="model-icon">〰️🔀</div>
+          <div>
+            <div class="model-name">Nonlinear Mixed Effects Model</div>
+            <div class="model-abbr">NLME</div>
+          </div>
+          <span class="model-chapter"><span class="chapter-tag">Chapter 3 — §3.3</span></span>
+        </div>
+
+        <div class="model-grid">
+          <div class="mg-label">Model</div>
+          <div class="mg-value">$$Y_{ij} = \eta(\boldsymbol{\beta} + \mathbf{A}\mathbf{b}_i,\, x_{ij}) + \varepsilon_{ij}$$</div>
+
+          <div class="mg-label">Random effects</div>
+          <div class="mg-value">$\mathbf{b}_i \sim \N(\mathbf{0}, \boldsymbol{\Sigma}_b)$; &nbsp;$\mathbf{A}$ selects which params vary by cluster</div>
+
+          <div class="mg-label">Individual params</div>
+          <div class="mg-value">$\boldsymbol{\beta}_i = \boldsymbol{\beta} + \mathbf{A}\mathbf{b}_i$ &nbsp;— subject-specific parameter vector</div>
+
+          <div class="mg-label">Log-scale trick</div>
+          <div class="mg-value">Work with $\gamma_k = \log\beta_k$ to ensure positivity; $\beta_{ij} = \exp(\gamma_k + b_{ik})$ is log-normal</div>
+
+          <div class="mg-label">Predictions</div>
+          <div class="mg-value">
+            <ul style="margin:0;padding-left:1.2rem;">
+              <li><em>Population:</em> $\hat Y^{\mathrm{pop}} = \eta(\hat{\boldsymbol{\beta}}, x)$ — for a new subject</li>
+              <li><em>Individual:</em> $\hat Y^{\mathrm{ind}} = \eta(\hat{\boldsymbol{\beta}} + \hat{\mathbf{b}}_i, x)$ — for observed subject</li>
+            </ul>
+          </div>
+
+          <div class="mg-label">Estimation</div>
+          <div class="mg-value">Laplace approx. to marginal likelihood (nlme/nlmer); REML for variance components</div>
+
+          <div class="mg-label">R function</div>
+          <div class="mg-value"><code>nlme::nlme()</code> or <code>lme4::nlmer()</code></div>
+
+          <div class="mg-label">Complexity</div>
+          <div class="mg-value">
+            <div class="complexity-bar">
+              <div class="complexity-pip filled"></div><div class="complexity-pip filled"></div>
+              <div class="complexity-pip filled"></div><div class="complexity-pip filled"></div>
+              <div class="complexity-pip"></div>&nbsp;4 / 5
+            </div>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="model-tag">Pharmacokinetics</span>
+          <span class="model-tag">Repeated measures</span>
+          <span class="model-tag">Physical parameters</span>
+          <span class="model-tag">Log-normal random effects</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="latent-cards">Latent Variable Models</h2>
+
+      <!-- ── Finite mixture ── -->
+      <div class="model-card" data-tags="ch4 normal count binary">
+        <div class="model-card-header">
+          <div class="model-icon">🎲</div>
+          <div>
+            <div class="model-name">Finite Mixture Model</div>
+            <div class="model-abbr">FMM</div>
+          </div>
+          <span class="model-chapter"><span class="chapter-tag">Chapter 4 — §4.3</span></span>
+        </div>
+
+        <div class="model-grid">
+          <div class="mg-label">Density</div>
+          <div class="mg-value">$$f(y;\boldsymbol{\pi},\boldsymbol{\theta}) = \sum_{k=1}^K \pi_k\, f_k(y;\theta_k)$$</div>
+
+          <div class="mg-label">Latent variable</div>
+          <div class="mg-value">$U_i \in \{1,\ldots,K\}$ with $P(U_i=k)=\pi_k$ — component membership</div>
+
+          <div class="mg-label">Mixing weights</div>
+          <div class="mg-value">$\pi_k \geq 0$, $\sum_k \pi_k = 1$</div>
+
+          <div class="mg-label">Gaussian case</div>
+          <div class="mg-value">$f_k = \N(\mu_k,\sigma_k^2)$; parameters $\boldsymbol{\theta} = \{(\mu_k,\sigma_k^2)\}_{k=1}^K$</div>
+
+          <div class="mg-label">Non-regularity</div>
+          <div class="mg-value">Label switching ($K!$ equivalent maxima); unbounded likelihood (degenerate components); set $\sigma_k^2 \geq \sigma^2_{\min}$</div>
+
+          <div class="mg-label">Estimation</div>
+          <div class="mg-value">EM algorithm (Section 4.5); multiple random starts essential</div>
+
+          <div class="mg-label">Select $K$</div>
+          <div class="mg-value">BIC (not LRT — regularity fails); bootstrap LRT; ICL criterion</div>
+
+          <div class="mg-label">R function</div>
+          <div class="mg-value"><code>mclust::Mclust(y, G=1:10)</code></div>
+
+          <div class="mg-label">Complexity</div>
+          <div class="mg-value">
+            <div class="complexity-bar">
+              <div class="complexity-pip filled"></div><div class="complexity-pip filled"></div>
+              <div class="complexity-pip filled"></div><div class="complexity-pip"></div>
+              <div class="complexity-pip"></div>&nbsp;3 / 5
+            </div>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="model-tag">Clustering</span>
+          <span class="model-tag">EM algorithm</span>
+          <span class="model-tag">Multimodal data</span>
+          <span class="model-tag">BIC for K</span>
+          <span class="model-tag">Non-regular MLE</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="ic-formulas">Information Criterion Formulas</h2>
+
+      <div class="callout note">
+        <div class="callout-title">📐 All information criteria at a glance</div>
+        <div class="table-wrapper"><table>
+          <thead>
+            <tr><th>Criterion</th><th>Formula</th><th>Penalty / param</th><th>Goal</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>AIC</strong></td>
+              <td>$2p - 2\ell(\hat{\boldsymbol{\theta}})$</td>
+              <td>$2$</td>
+              <td>Predictive accuracy (KL)</td>
+            </tr>
+            <tr>
+              <td><strong>AIC$_c$</strong></td>
+              <td>$\mathrm{AIC} + \frac{2p(p+1)}{n-p-1}$</td>
+              <td>$2 + \frac{2(p+1)}{n-p-1}$</td>
+              <td>AIC for small $n$</td>
+            </tr>
+            <tr>
+              <td><strong>BIC</strong></td>
+              <td>$p\log n - 2\ell(\hat{\boldsymbol{\theta}})$</td>
+              <td>$\log n$</td>
+              <td>Bayesian marginal likelihood</td>
+            </tr>
+            <tr>
+              <td><strong>TIC</strong></td>
+              <td>$2\,\mathrm{tr}(\hat J^{-1}\hat K) - 2\ell(\hat{\boldsymbol{\theta}})$</td>
+              <td>$2\,\mathrm{tr}(\hat J^{-1}\hat K)/p \approx 2$</td>
+              <td>AIC under misspecification</td>
+            </tr>
+            <tr>
+              <td><strong>$C_p$</strong></td>
+              <td>$\mathrm{RSS}_p/\hat\sigma^2 - n + 2p$</td>
+              <td>$2$</td>
+              <td>Prediction error (linear models)</td>
+            </tr>
+            <tr>
+              <td><strong>LOO-CV</strong></td>
+              <td>$\frac{1}{n}\sum_i\!\left(\frac{e_i}{1-h_{ii}}\right)^2$</td>
+              <td>—</td>
+              <td>Direct prediction error estimate</td>
+            </tr>
+          </tbody>
+        </table></div>
+        <p style="margin:0.75rem 0 0;font-size:0.88rem;color:var(--text-secondary);">
+          All criteria are to be <strong>minimised</strong>. For model comparison, only
+          <em>differences</em> matter; the scale is the same as $-2\log$-likelihood.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="decision-tree">Model Decision Guide</h2>
+
+      <div class="callout note">
+        <div class="callout-title">🗺️ Which model should I use?</div>
+        <pre style="background:none;border:none;padding:0;font-family:var(--font-mono);font-size:0.83rem;line-height:1.7;overflow-x:auto;">
+Start here: What is your response variable?
+│
+├─ Continuous (normal errors likely)
+│   ├─ Independent observations?
+│   │   ├─ Linear relationship?    → LM        (lm)
+│   │   └─ Nonlinear relationship? → NLS       (nls)
+│   └─ Clustered / repeated?
+│       ├─ Linear relationship?    → LMM       (lmer)
+│       └─ Nonlinear relationship? → NLME      (nlme / nlmer)
+│
+├─ Binary (0/1)
+│   ├─ Independent observations?
+│   │   └─ Logistic / probit       → GLM       (glm, family=binomial)
+│   └─ Clustered?
+│       ├─ Subject-specific focus? → GLMM      (glmer, nAGQ ≥ 10)
+│       └─ Population-avg focus?   → GEE       (geeglm)
+│
+├─ Count (0, 1, 2, ...)
+│   ├─ Var ≈ Mean (no overdispersion)?
+│   │   └─ Poisson GLM             → GLM       (glm, family=poisson)
+│   ├─ Var >> Mean (overdispersion)?
+│   │   ├─ Want full likelihood?   → Neg-Bin   (glm.nb)
+│   │   └─ Just need correct SE?   → Quasi     (quasipoisson)
+│   └─ Clustered counts?
+│       └─ GLMM with Poisson       → GLMM      (glmer, family=poisson)
+│
+└─ Multimodal / grouped unknown membership
+    └─ Mixture model               → FMM + EM  (Mclust)
+        </pre>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+<script>
+  /* Filter logic */
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const f = btn.dataset.filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.model-card').forEach(card => {
+        if (f === 'all' || card.dataset.tags.split(' ').includes(f)) {
+          card.style.display = '';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Introduction — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <!-- Highlight.js for R code -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <!-- MathJax -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams', packages: {'[+]': ['boldsymbol']} },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="index">
+
+<!-- ═══ Header ═══ -->
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn" aria-label="Toggle menu">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<!-- ═══ Layout ═══ -->
+<div id="layout">
+
+  <!-- Left sidebar (injected by nav.js) -->
+  <nav id="sidebar"></nav>
+
+  <!-- Main -->
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <!-- Page title -->
+      <div class="chapter-meta">
+        <span class="chapter-badge">Introduction</span>
+        <span class="chapter-tag">Donnie — Statistical Modelling</span>
+      </div>
+
+      <h1 class="page-title">Statistical Modelling</h1>
+      <p class="page-subtitle">A complete, beginner-to-expert guide — from first principles to modern methods</p>
+
+      <!-- ═══════════════════════════════════ -->
+      <h2 id="welcome">Welcome</h2>
+
+      <blockquote>
+        "All models are wrong; the practical question is how wrong do they have to be to not be useful."
+        <cite>— George E. P. Box (1979)</cite>
+      </blockquote>
+
+      <p>
+        These notes form a complete course in <strong>Statistical Modelling</strong>, designed to take you from
+        the foundations of probability and likelihood all the way to advanced topics such as mixed models,
+        nonlinear regression, and latent variable methods. Whether you are encountering these ideas for the
+        first time or refreshing knowledge you built elsewhere, every section is written to be self-contained,
+        mathematically rigorous, and rich with intuitive explanations.
+      </p>
+
+      <p>
+        The guiding philosophy is that understanding the <em>why</em> behind every formula matters just as
+        much as knowing the formula itself. Wherever a result can be derived, we derive it from first
+        principles — step by step. Wherever a concept can be illustrated, we illustrate it with real data
+        or concrete numerical examples.
+      </p>
+
+      <!-- ═══════════════════════════════════ -->
+      <h2 id="structure">Course Structure</h2>
+
+      <p>The material is organised into four main chapters plus two hands-on laboratory sessions:</p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Chapter</th>
+              <th>Title</th>
+              <th>Core Theme</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>1</strong></td>
+              <td><a href="model-selection.html">Model Selection</a></td>
+              <td>AIC, BIC, cross-validation, Bayesian model choice</td>
+            </tr>
+            <tr>
+              <td><strong>2</strong></td>
+              <td><a href="beyond-glms.html">Beyond Generalised Linear Models</a></td>
+              <td>Overdispersion, mixed models, GEE, GLMM</td>
+            </tr>
+            <tr>
+              <td><strong>3</strong></td>
+              <td><a href="nonlinear.html">Nonlinear Models</a></td>
+              <td>Nonlinear regression and nonlinear mixed effects</td>
+            </tr>
+            <tr>
+              <td><strong>4</strong></td>
+              <td><a href="latent.html">Latent Variables</a></td>
+              <td>Mixture models, the EM algorithm, factor analysis</td>
+            </tr>
+            <tr>
+              <td><strong>L1</strong></td>
+              <td><a href="lab1.html">Lab 1 — AIC &amp; BIC in Practice</a></td>
+              <td>Simulation study on model selection criteria</td>
+            </tr>
+            <tr>
+              <td><strong>L2</strong></td>
+              <td><a href="lab2.html">Lab 2 — Linear Mixed Models</a></td>
+              <td>Haematocrit data; random effects and REML</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ═══════════════════════════════════ -->
+      <h2 id="prerequisites">Prerequisites</h2>
+
+      <p>
+        These notes assume familiarity with the following topics. Do not worry if your knowledge is a little
+        rusty — brief reminders are given wherever they are needed.
+      </p>
+
+      <h3 id="prereq-prob">Probability</h3>
+      <ul>
+        <li>Random variables and their probability distributions (discrete and continuous)</li>
+        <li>Joint, marginal, and conditional distributions</li>
+        <li>Expectations, variances, and covariances</li>
+        <li>The multivariate normal distribution $\mathbf{Y} \sim \mathrm{N}_p(\boldsymbol{\mu}, \boldsymbol{\Sigma})$</li>
+        <li>Convergence in probability and in distribution; the central limit theorem</li>
+      </ul>
+
+      <h3 id="prereq-stat">Statistical Inference</h3>
+      <ul>
+        <li>Maximum likelihood estimation and its asymptotic properties</li>
+        <li>The score function and observed / expected Fisher information</li>
+        <li>Likelihood ratio, Wald, and score tests</li>
+        <li>Bayesian updating: prior $\times$ likelihood $\propto$ posterior</li>
+      </ul>
+
+      <h3 id="prereq-models">Statistical Models</h3>
+      <ul>
+        <li>Linear regression: $\mathbf{Y} = \mathbf{X}\boldsymbol{\beta} + \boldsymbol{\varepsilon}$, ordinary least squares, residual diagnostics</li>
+        <li>
+          Generalised linear models (GLMs): exponential family distributions, link functions,
+          iteratively reweighted least squares (IWLS)
+        </li>
+        <li>Basic R programming: data frames, <code>glm()</code>, <code>lm()</code>, plotting</li>
+      </ul>
+
+      <div class="callout note">
+        <div class="callout-title">📘 Tip for complete beginners</div>
+        <p>
+          If GLMs are new to you, spend a few hours with any introductory statistics text covering
+          logistic and Poisson regression first. Everything in these notes builds naturally on top of
+          that foundation.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════ -->
+      <h2 id="notation">Notation Glossary</h2>
+
+      <p>
+        We adopt the following conventions throughout. Each chapter introduces any additional
+        notation where it first appears.
+      </p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Symbol</th><th>Meaning</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>$y, \mathbf{y}$</td><td>Observed scalar / vector data</td></tr>
+            <tr><td>$Y, \mathbf{Y}$</td><td>Random scalar / vector</td></tr>
+            <tr><td>$\boldsymbol{\theta}, \boldsymbol{\beta}$</td><td>Parameter vectors</td></tr>
+            <tr><td>$\hat{\boldsymbol{\theta}}$</td><td>Maximum likelihood estimate (MLE)</td></tr>
+            <tr><td>$\ell(\boldsymbol{\theta})$</td><td>Log-likelihood $= \log f(\mathbf{y};\boldsymbol{\theta})$</td></tr>
+            <tr><td>$\ell(\boldsymbol{\theta};\mathbf{y})$</td><td>Log-likelihood evaluated at data $\mathbf{y}$</td></tr>
+            <tr><td>$s(\boldsymbol{\theta})$</td><td>Score vector $= \partial \ell / \partial \boldsymbol{\theta}$</td></tr>
+            <tr><td>$\mathcal{I}(\boldsymbol{\theta})$</td><td>Expected Fisher information matrix</td></tr>
+            <tr><td>$J(\boldsymbol{\theta})$</td><td>Observed information matrix $= -\partial^2\ell/\partial\boldsymbol{\theta}\partial\boldsymbol{\theta}^\top$</td></tr>
+            <tr><td>$K(\boldsymbol{\theta})$</td><td>Outer-product of scores matrix (used under misspecification)</td></tr>
+            <tr><td>$\mathbf{H}$</td><td>Hat matrix in linear regression</td></tr>
+            <tr><td>$p$</td><td>Number of parameters; also dimension of parameter space</td></tr>
+            <tr><td>$n$</td><td>Sample size</td></tr>
+            <tr><td>$\mathbb{E}[\cdot]$, $\mathrm{Var}(\cdot)$</td><td>Expectation and variance operators</td></tr>
+            <tr><td>$\overset{d}{\to}$, $\overset{p}{\to}$</td><td>Convergence in distribution / probability</td></tr>
+            <tr><td>$\mathrm{KL}(g \Vert f)$</td><td>Kullback–Leibler divergence from $f$ to $g$</td></tr>
+            <tr><td>$\Phi(\cdot)$</td><td>Standard normal CDF</td></tr>
+            <tr><td>$\phi(\cdot)$</td><td>Standard normal PDF</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ═══════════════════════════════════ -->
+      <h2 id="how-to-use">How to Use These Notes</h2>
+
+      <ul>
+        <li>
+          <strong>Read linearly on first pass.</strong> Each chapter builds on the previous one.
+          Cross-references signal where you may need to revisit earlier material.
+        </li>
+        <li>
+          <strong>Work through every example.</strong> Pause when you reach an example, try to work
+          out the answer yourself, then compare with the solution given.
+        </li>
+        <li>
+          <strong>Run the R code.</strong> All code is meant to be executed in an R session
+          (version ≥ 4.2 recommended). Required packages are stated at the start of each lab.
+        </li>
+        <li>
+          <strong>Prove things yourself.</strong> Steps marked <em>Exercise</em> are small proofs
+          or derivations intentionally left to you. Full solutions are in the lab sheets.
+        </li>
+        <li>
+          <strong>Use the sidebar TOC.</strong> Each page has a collapsible table of contents on
+          the right that tracks your reading position. Click any heading to jump directly there.
+        </li>
+      </ul>
+
+      <!-- ═══════════════════════════════════ -->
+      <h2 id="software">Software &amp; Packages</h2>
+
+      <p>
+        All examples are implemented in <strong>R</strong>. The following packages are used across the notes.
+        Install them all at once with:
+      </p>
+
+      <div class="code-label">R</div>
+      <pre><code class="language-r">install.packages(c(
+  "lme4",        # Linear and generalised linear mixed models
+  "nlme",        # Nonlinear mixed effects models
+  "mclust",      # Mixture model fitting via EM
+  "MASS",        # Datasets (galaxies, etc.) and utilities
+  "ggplot2",     # Data visualisation
+  "dplyr",       # Data manipulation
+  "tidyr",       # Data reshaping
+  "broom",       # Tidy model summaries
+  "knitr",       # Reproducible reporting
+  "brglm2",      # Bias-reduced GLMs
+  "statmod",     # Gauss-Hermite quadrature
+  "numDeriv"     # Numerical differentiation for Hessians
+))</code></pre>
+
+      <!-- ═══════════════════════════════════ -->
+      <h2 id="four-principles">The Four Guiding Principles of Modelling</h2>
+
+      <p>
+        Before diving into the mathematics, it is worth grounding ourselves in four overarching
+        principles that should guide every modelling decision you make. These will reappear
+        throughout the course.
+      </p>
+
+      <h3 id="principle-1">Principle 1 — Substantive Knowledge First</h3>
+      <p>
+        A statistical model should encode what you know <em>before</em> seeing the data. If you are
+        modelling drug concentration in blood over time, a mechanistic pharmacokinetic equation is
+        far better than a polynomial with arbitrarily many terms. Prior scientific knowledge reduces
+        the effective model space and guards against spurious discoveries.
+      </p>
+
+      <h3 id="principle-2">Principle 2 — Robustness</h3>
+      <p>
+        No model is exactly right. A good model should give approximately correct answers even when
+        some of its assumptions are mildly violated. Chapter 2 develops quasi-likelihood methods
+        and marginal models precisely because they relax distributional assumptions while retaining
+        the interpretability of GLM-style inference.
+      </p>
+
+      <h3 id="principle-3">Principle 3 — Quality of Fit</h3>
+      <p>
+        After fitting a model, always examine residuals and goodness-of-fit statistics. A model that
+        passes all parsimony criteria but whose residuals show obvious structure is still wrong in a
+        practically important way. Residual plots, Q–Q plots, and deviance residuals are your
+        first diagnostic tools.
+      </p>
+
+      <h3 id="principle-4">Principle 4 — Parsimony</h3>
+      <p>
+        Among models that fit equally well, prefer the simpler one. This is Occam's Razor,
+        formalised in information criteria such as AIC and BIC. Simpler models generalise better
+        to new data, are easier to interpret, and require fewer assumptions.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">💡 The tension between fit and parsimony</div>
+        <p>
+          Adding parameters to a model <em>always</em> improves in-sample fit. The question is
+          whether the improvement justifies the added complexity. Chapter 1 makes this tension
+          mathematically precise through the bias–variance decomposition and information criteria.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════ -->
+      <h2 id="model-hierarchy">The Model Hierarchy</h2>
+
+      <p>
+        The four chapters trace a hierarchy of increasingly general models. The diagram below
+        summarises how each model class extends the previous one:
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">📐 Model Hierarchy</div>
+        <pre style="background:none;border:none;padding:0;font-family:var(--font-mono);font-size:0.85rem;overflow-x:auto;">
+Linear Models (LM)
+  └─▶ Generalised Linear Models (GLM)
+        └─▶ Generalised Linear Mixed Models (GLMM)   ← Chapter 2
+              └─▶ Generalised Nonlinear Mixed Models (GNLMM)  ← Chapter 3
+                    └─▶ Latent Variable Models (LVM)  ← Chapter 4
+                          └─▶ Mixture Models (EM)     ← Chapter 4
+        </pre>
+      </div>
+
+      <p>
+        A <strong>Linear Model (LM)</strong> assumes $Y_i = \mathbf{x}_i^\top \boldsymbol{\beta} + \varepsilon_i$
+        with $\varepsilon_i \sim \mathrm{N}(0,\sigma^2)$. A <strong>GLM</strong> replaces
+        $\mathrm{N}(0,\sigma^2)$ by any exponential family distribution and introduces a link
+        function $g$ so that $g(\mu_i) = \mathbf{x}_i^\top \boldsymbol{\beta}$. A <strong>GLMM</strong>
+        adds random effects $\mathbf{b}_i$ into the linear predictor; a <strong>GNLMM</strong>
+        further replaces the linear predictor with a nonlinear function $\eta(\boldsymbol{\beta}, \mathbf{x}_i)$.
+        Finally, <strong>Latent Variable Models</strong> provide a unifying framework for all of
+        the above by explicitly modelling unobserved quantities.
+      </p>
+
+      <!-- ═══════════════════════════════════ -->
+      <h2 id="acks">Acknowledgements</h2>
+      <p>
+        These notes were assembled and greatly expanded from standard graduate-level sources in
+        statistical modelling. The mathematical content draws on the classical literature in
+        information criteria (Akaike, Schwarz), generalised linear models (McCullagh &amp; Nelder),
+        mixed models (Laird &amp; Ware), the EM algorithm (Dempster, Laird &amp; Rubin), and
+        Bayesian computation (Gelman et al.). A full reference list is given in the
+        <a href="bibliography.html">Bibliography</a>.
+      </p>
+
+      <!-- Chapter navigation -->
+      <div class="chapter-nav">
+        <span></span>
+        <a href="model-selection.html" class="next">
+          <span class="nav-label">Next Chapter</span>
+          <span class="nav-title">1 — Model Selection →</span>
+        </a>
+      </div>
+
+    </div><!-- .content-wrapper -->
+  </main>
+
+  <!-- Right TOC -->
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+
+</div><!-- #layout -->
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+</body>
+</html>

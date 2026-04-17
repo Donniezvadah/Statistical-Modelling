@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter 2: Beyond GLMs — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams',
+        macros: {
+          btheta:'\\boldsymbol{\\theta}', bbeta:'\\boldsymbol{\\beta}',
+          bmu:'\\boldsymbol{\\mu}', bSigma:'\\boldsymbol{\\Sigma}',
+          bx:'\\mathbf{x}', by:'\\mathbf{y}', bX:'\\mathbf{X}',
+          bY:'\\mathbf{Y}', bb:'\\mathbf{b}', bZ:'\\mathbf{Z}',
+          E:'\\mathbb{E}', Var:'\\mathrm{Var}', Cov:'\\mathrm{Cov}'
+        }
+      },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="beyond-glms">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Chapter 2</span>
+        <span class="chapter-tag">Beyond GLMs</span>
+        <span class="chapter-tag">Overdispersion · Mixed Models · GEE · GLMM</span>
+      </div>
+
+      <h1 class="page-title">Beyond Generalised Linear Models</h1>
+      <p class="page-subtitle">Handling overdispersion, clustering, and unobserved heterogeneity</p>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <h2 id="glm-review">2.1 A Brief Review of GLMs</h2>
+
+      <p>
+        A <strong>Generalised Linear Model (GLM)</strong> consists of three components working together:
+      </p>
+
+      <ol>
+        <li>
+          <strong>A distributional assumption:</strong> $Y_i \mid \mathbf{x}_i$ belongs to the
+          <em>exponential family</em> with density
+          $$f(y_i; \theta_i, \phi) = \exp\!\left\{\frac{y_i \theta_i - b(\theta_i)}{a(\phi)} + c(y_i,\phi)\right\}$$
+          The mean and variance are $\mu_i = b'(\theta_i)$ and $\mathrm{Var}(Y_i) = a(\phi) b''(\theta_i)$.
+        </li>
+        <li>
+          <strong>A systematic component (linear predictor):</strong>
+          $\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta}$, where $\mathbf{x}_i$ is a covariate
+          vector and $\boldsymbol{\beta}$ is a parameter vector.
+        </li>
+        <li>
+          <strong>A link function:</strong> $g(\mu_i) = \eta_i$, connecting mean to linear predictor.
+          Common choices: logit for Bernoulli, log for Poisson, identity for Normal.
+        </li>
+      </ol>
+
+      <h3 id="glm-assumptions">When GLM Assumptions Fail</h3>
+      <p>GLMs can break down in four important ways:</p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Problem</th><th>Symptom</th><th>Chapter 2 Solution</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Overdispersion</strong></td>
+              <td>Residual deviance $\gg$ degrees of freedom</td>
+              <td>Quasi-likelihood, Beta-Binomial, Negative Binomial</td>
+            </tr>
+            <tr>
+              <td><strong>Clustering / dependence</strong></td>
+              <td>Observations within groups are correlated</td>
+              <td>Mixed models, GEE</td>
+            </tr>
+            <tr>
+              <td><strong>Unobserved heterogeneity</strong></td>
+              <td>Unit-to-unit variation unexplained by covariates</td>
+              <td>Random effects (GLMM)</td>
+            </tr>
+            <tr>
+              <td><strong>Non-independence</strong></td>
+              <td>Spatial, temporal, or hierarchical data structure</td>
+              <td>Marginal models with structured correlation</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <h2 id="overdispersion">2.2 Overdispersion</h2>
+
+      <p>
+        <strong>Overdispersion</strong> occurs when the observed variance in the data exceeds
+        the variance predicted by the assumed distribution. For example, the Poisson model
+        requires $\mathrm{Var}(Y) = \mu$, but in practice the variance is often a multiple $\phi > 1$
+        of the mean.
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 2.1 — Overdispersion</div>
+        <p>
+          A response $Y$ exhibits <strong>overdispersion</strong> relative to a GLM if
+          $$\mathrm{Var}(Y \mid \mathbf{x}) > V(\mu)/m$$
+          where $V(\mu) = b''(\theta)$ is the variance function of the exponential family and
+          $m$ is the relevant denominator (e.g., binomial $m$ for proportions). The
+          <strong>dispersion parameter</strong> is $\phi = \mathrm{Var}(Y) / (V(\mu)/m) > 1$.
+        </p>
+      </div>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 2.1 — Toxoplasmosis Data</div>
+        <p>
+          Data from 34 cities in El Salvador record the number of individuals testing positive
+          for toxoplasmosis infection. The covariate is annual rainfall (mm). We model the
+          proportion of positives as Binomial.
+        </p>
+        <div class="code-label">R</div>
+        <pre><code class="language-r">library(MASS)
+data(Toxo)  # or load from your source
+
+# Fit cubic logistic regression
+fit_cubic <- glm(cbind(Cases, Total - Cases) ~ poly(Rainfall, 3),
+                 family = binomial, data = Toxo)
+
+# Diagnose overdispersion
+cat("Residual deviance:", deviance(fit_cubic), "\n")
+cat("Degrees of freedom:", df.residual(fit_cubic), "\n")
+cat("Deviance/df ratio:", deviance(fit_cubic) / df.residual(fit_cubic), "\n")
+# Ratio >> 1 signals overdispersion</code></pre>
+        <p>
+          The residual deviance of approximately 62.6 on 30 degrees of freedom (ratio $\approx 2.1$)
+          is strong evidence of overdispersion. The binomial model is inadequate.
+        </p>
+      </div>
+
+      <h3 id="quasi">Quasi-Likelihood</h3>
+
+      <p>
+        The <strong>quasi-likelihood</strong> approach, introduced by Wedderburn (1974), relaxes
+        the full distributional assumption. Instead of specifying $f(y;\boldsymbol{\theta})$, we
+        only specify the <em>mean–variance relationship</em>:
+        $$\mathbb{E}[Y_i \mid \mathbf{x}_i] = \mu_i, \qquad \mathrm{Var}(Y_i \mid \mathbf{x}_i) = \phi \frac{V(\mu_i)}{m_i}$$
+      </p>
+
+      <p>The quasi-score function is defined as:</p>
+      $$U(\boldsymbol{\beta}) = \sum_{i=1}^n \frac{(y_i - \mu_i)}{\phi V(\mu_i)/m_i} \cdot \frac{\partial \mu_i}{\partial \boldsymbol{\beta}}$$
+
+      <p>
+        This is exactly the score of a genuine exponential family model with the given
+        mean–variance structure, even though no such distribution may exist. Parameter
+        estimates are obtained by solving $U(\boldsymbol{\beta}) = \mathbf{0}$.
+      </p>
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 2.1 — Consistency of Quasi-MLE</div>
+        <p>
+          If the mean model $g(\mu_i) = \mathbf{x}_i^\top \boldsymbol{\beta}$ and the variance
+          function $\phi V(\mu_i)/m_i$ are correctly specified, the quasi-MLE
+          $\hat{\boldsymbol{\beta}}$ is consistent and
+          $$\sqrt{n}(\hat{\boldsymbol{\beta}} - \boldsymbol{\beta}_0) \overset{d}{\to} \mathrm{N}\!\left(\mathbf{0},\, \phi (\mathbf{X}^\top \mathbf{W} \mathbf{X})^{-1}\right)$$
+          where $\mathbf{W} = \mathrm{diag}(m_i V(\mu_i)^{-1} (\partial\mu_i/\partial\eta_i)^2)$.
+        </p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Why does quasi-likelihood work? (Proof sketch)</summary>
+        <div class="proof-body">
+          <p>
+            The key insight is that all the information we need about $\boldsymbol{\beta}$
+            from the data is captured by the first two moments. The quasi-score satisfies:
+          </p>
+          <ul>
+            <li>$\mathbb{E}[U(\boldsymbol{\beta}_0)] = \mathbf{0}$ (unbiasedness)</li>
+            <li>$\mathrm{Var}(U(\boldsymbol{\beta}_0)) = -\mathbb{E}[\partial U / \partial \boldsymbol{\beta}^\top]$ (information identity)</li>
+          </ul>
+          <p>
+            These two properties are sufficient for the standard M-estimator theory to apply,
+            giving consistency and asymptotic normality even without a full likelihood.
+          </p>
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <p>In practice, fit a quasi-model in R by specifying <code>family = quasibinomial</code> or <code>quasipoisson</code>:</p>
+
+      <div class="code-label">R</div>
+      <pre><code class="language-r"># Quasi-binomial adjusts for overdispersion automatically
+fit_quasi <- glm(cbind(Cases, Total - Cases) ~ poly(Rainfall, 3),
+                 family = quasibinomial, data = Toxo)
+
+summary(fit_quasi)
+# Standard errors are inflated by sqrt(phi_hat) relative to binomial</code></pre>
+
+      <h3 id="beta-binomial">Beta-Binomial Model</h3>
+
+      <p>
+        The Beta-Binomial model provides a <em>parametric</em> account of overdispersion.
+        The idea: the success probability $P_i$ itself varies randomly across units.
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 2.2 — Beta-Binomial Model</div>
+        <p>
+          Assume $P_i \sim \mathrm{Beta}(\alpha_i, \beta_i)$ with
+          $\mu_i = \alpha_i/(\alpha_i + \beta_i)$ and precision $\rho_i = 1/(\alpha_i + \beta_i + 1) \in (0,1)$.
+          Given $P_i$, responses are $Y_i \mid P_i \sim \mathrm{Bin}(m_i, P_i)$. Then:
+        </p>
+        $$\mathbb{E}[Y_i] = m_i \mu_i, \qquad \mathrm{Var}(Y_i) = m_i \mu_i(1-\mu_i)\left[1 + (m_i-1)\rho_i\right]$$
+        <p>
+          The factor $[1 + (m_i-1)\rho_i] > 1$ is the <strong>overdispersion multiplier</strong>.
+          The intraclass correlation $\rho_i$ measures the variability in $P_i$.
+        </p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Derivation of Beta-Binomial mean and variance</summary>
+        <div class="proof-body">
+          <p>Using the law of total expectation and variance:</p>
+          $$\mathbb{E}[Y_i] = \mathbb{E}[\mathbb{E}[Y_i \mid P_i]] = \mathbb{E}[m_i P_i] = m_i \mu_i$$
+          $$\mathrm{Var}(Y_i) = \mathbb{E}[\mathrm{Var}(Y_i \mid P_i)] + \mathrm{Var}(\mathbb{E}[Y_i \mid P_i])$$
+          $$= \mathbb{E}[m_i P_i(1-P_i)] + \mathrm{Var}(m_i P_i)$$
+          $$= m_i[\mu_i(1-\mu_i) - \mathrm{Var}(P_i)] + m_i^2 \mathrm{Var}(P_i)$$
+          <p>
+            For $P_i \sim \mathrm{Beta}(\alpha,\beta)$, $\mathrm{Var}(P_i) = \mu_i(1-\mu_i)\rho_i$
+            where $\rho_i = 1/(\alpha+\beta+1)$. Substituting:
+          </p>
+          $$\mathrm{Var}(Y_i) = m_i\mu_i(1-\mu_i)(1-\rho_i) + m_i^2 \mu_i(1-\mu_i)\rho_i$$
+          $$= m_i\mu_i(1-\mu_i)[1 + (m_i-1)\rho_i]$$
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <h3 id="negbin">Negative Binomial for Count Overdispersion</h3>
+
+      <p>
+        For count data (Poisson), the analogous model is the <strong>Negative Binomial</strong>.
+        Let $U_i \sim \mathrm{Gamma}(\nu, \nu/\mu_i)$ (so $\mathbb{E}[U_i] = \mu_i$, $\mathrm{Var}(U_i) = \mu_i^2/\nu$).
+        Given $U_i$, $Y_i \mid U_i \sim \mathrm{Poisson}(U_i)$. Then:
+      </p>
+      $$\mathbb{E}[Y_i] = \mu_i, \qquad \mathrm{Var}(Y_i) = \mu_i + \frac{\mu_i^2}{\nu}$$
+
+      <p>
+        As $\nu \to \infty$, the Poisson is recovered. The parameter $1/\nu$ is the
+        <strong>overdispersion parameter</strong>. In R:
+      </p>
+
+      <div class="code-label">R</div>
+      <pre><code class="language-r">library(MASS)
+# glm.nb fits Negative Binomial
+fit_nb <- glm.nb(y ~ x1 + x2, data = mydata)
+summary(fit_nb)
+# Theta = nu (overdispersion parameter)</code></pre>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <h2 id="dependence">2.3 Dependence and Clustered Data</h2>
+
+      <p>
+        Many datasets have a <strong>clustered structure</strong>: observations within a group
+        (cluster, subject, school, city) are correlated, while observations from different
+        groups are independent.
+      </p>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 2.2 — Rat Growth Data</div>
+        <p>
+          Body weight (grams) of 30 rats measured at weeks 1, 3, 5, 7, and 9 after birth.
+          Interest is in the growth trajectory. Individual rats vary in both their starting
+          weight (intercept) and growth rate (slope).
+        </p>
+        <div class="code-label">R</div>
+        <pre><code class="language-r">data(Rats, package = "nlme")  # or equivalent
+
+# Naive linear regression ignoring clustering
+fit_naive <- lm(weight ~ week, data = Rats)
+
+# Plot residuals by rat - reveals clustering structure
+library(ggplot2)
+Rats$resid <- residuals(fit_naive)
+ggplot(Rats, aes(x = week, y = resid, group = rat, colour = factor(rat))) +
+  geom_line(alpha = 0.6) +
+  labs(title = "Residuals by rat — clear between-rat heterogeneity",
+       x = "Week", y = "Residual")</code></pre>
+        <p>
+          The residual plot shows that observations from the same rat tend to be on the same
+          side of zero — evidence of positive intraclass correlation. Ignoring this will
+          underestimate standard errors and inflate false-positive rates.
+        </p>
+      </div>
+
+      <h3 id="marginal-vs-re">Marginal vs. Subject-Specific Models</h3>
+
+      <p>
+        There is a fundamental conceptual distinction between two modelling approaches for
+        clustered data:
+      </p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Approach</th>
+              <th>Parameter meaning</th>
+              <th>Question answered</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Marginal models</strong> (GEE)</td>
+              <td>Population-averaged effect of $\mathbf{x}$</td>
+              <td>"What happens to the <em>average</em> response if we change $\mathbf{x}$?"</td>
+            </tr>
+            <tr>
+              <td><strong>Mixed / random-effects models</strong></td>
+              <td>Subject-specific effect of $\mathbf{x}$</td>
+              <td>"For a <em>specific individual</em> with given random effects, how does response change with $\mathbf{x}$?"</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        For linear models these two coincide (marginalising over random effects does not change
+        regression coefficients). For nonlinear models (e.g., logistic regression) they give
+        different values and the distinction is crucial.
+      </p>
+
+      <h3 id="gee">Generalised Estimating Equations (GEE)</h3>
+
+      <p>
+        GEE, proposed by Liang and Zeger (1986), extends quasi-likelihood to clustered data.
+        Let $Y_{ij}$ be the $j$-th observation in cluster $i$ ($j = 1, \ldots, n_i$;
+        $i = 1, \ldots, m$). The GEE approach specifies:
+      </p>
+      <ul>
+        <li>$\mathbb{E}[Y_{ij}] = \mu_{ij}$ with $g(\mu_{ij}) = \mathbf{x}_{ij}^\top \boldsymbol{\beta}$</li>
+        <li>$\mathrm{Var}(Y_{ij}) = \phi V(\mu_{ij})/w_{ij}$</li>
+        <li>A <strong>working correlation matrix</strong> $\mathbf{R}_i(\boldsymbol{\alpha})$ for observations within cluster $i$</li>
+      </ul>
+
+      <p>The GEE estimating equations are:</p>
+      $$\sum_{i=1}^m \mathbf{D}_i^\top \mathbf{V}_i^{-1}(\mathbf{y}_i - \boldsymbol{\mu}_i) = \mathbf{0}$$
+      <p>where $\mathbf{D}_i = \partial \boldsymbol{\mu}_i / \partial \boldsymbol{\beta}^\top$ and
+      $\mathbf{V}_i = \phi \mathbf{A}_i^{1/2} \mathbf{R}_i(\boldsymbol{\alpha}) \mathbf{A}_i^{1/2}$
+      is the working covariance matrix ($\mathbf{A}_i = \mathrm{diag}(V(\mu_{ij})/w_{ij})$).
+      </p>
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 2.2 — Robustness of GEE</div>
+        <p>
+          If the mean model $g(\mu_{ij}) = \mathbf{x}_{ij}^\top \boldsymbol{\beta}$ is correctly
+          specified, the GEE estimator $\hat{\boldsymbol{\beta}}$ is consistent regardless of
+          whether the working correlation $\mathbf{R}_i$ is correct.
+          Its asymptotic covariance is given by the <strong>sandwich estimator</strong>:
+        </p>
+        $$\mathrm{Var}(\hat{\boldsymbol{\beta}}) \approx \mathbf{A}^{-1} \mathbf{B} \mathbf{A}^{-1}$$
+        <p>
+          where $\mathbf{A} = \sum_i \mathbf{D}_i^\top \mathbf{V}_i^{-1} \mathbf{D}_i$ and
+          $\mathbf{B} = \sum_i \mathbf{D}_i^\top \mathbf{V}_i^{-1} \mathrm{Cov}(\mathbf{y}_i) \mathbf{V}_i^{-1} \mathbf{D}_i$.
+        </p>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">💡 Choosing a working correlation structure</div>
+        <p>
+          Although consistency holds for any working correlation, efficiency improves when the
+          working correlation approximates the true one. Common choices:
+        </p>
+        <ul>
+          <li><strong>Independence:</strong> $\mathbf{R}_i = \mathbf{I}$ — ignores clustering (equivalent to standard GLM with robust SE)</li>
+          <li><strong>Exchangeable:</strong> $\mathrm{Cor}(Y_{ij}, Y_{ik}) = \alpha$ — appropriate for cross-sectional clusters</li>
+          <li><strong>AR(1):</strong> $\mathrm{Cor}(Y_{ij}, Y_{ik}) = \alpha^{|j-k|}$ — appropriate for time series</li>
+          <li><strong>Unstructured:</strong> all correlations estimated freely — flexible but requires large $m$</li>
+        </ul>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <h2 id="lmm">2.4 Linear Mixed Models (LMMs)</h2>
+
+      <p>
+        A <strong>Linear Mixed Model</strong> includes both <em>fixed effects</em>
+        (population-level parameters) and <em>random effects</em>
+        (cluster-specific deviations treated as random draws from a distribution).
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 2.3 — Linear Mixed Model</div>
+        <p>
+          For observations $Y_{ij}$ ($j = 1,\ldots,n_i$; $i = 1,\ldots,m$):
+        </p>
+        $$Y_{ij} = \mathbf{x}_{ij}^\top \boldsymbol{\beta} + \mathbf{z}_{ij}^\top \mathbf{b}_i + \varepsilon_{ij}$$
+        <p>where:</p>
+        <ul>
+          <li>$\boldsymbol{\beta}$ — fixed-effects parameter vector (population average)</li>
+          <li>$\mathbf{b}_i \sim \mathrm{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)$ — random effects for cluster $i$</li>
+          <li>$\varepsilon_{ij} \sim \mathrm{N}(0, \sigma^2)$ — within-cluster residual noise</li>
+          <li>$\mathbf{b}_i \perp \varepsilon_{ij}$ for all $i, j$</li>
+        </ul>
+        <p>In matrix form: $\mathbf{Y}_i = \mathbf{X}_i \boldsymbol{\beta} + \mathbf{Z}_i \mathbf{b}_i + \boldsymbol{\varepsilon}_i$</p>
+      </div>
+
+      <h3 id="lmm-marginal">Marginal Distribution of $\mathbf{Y}_i$</h3>
+
+      <p>
+        By marginalising over the random effects $\mathbf{b}_i$:
+      </p>
+      $$\mathbf{Y}_i \sim \mathrm{N}\!\left(\mathbf{X}_i \boldsymbol{\beta},\; \underbrace{\mathbf{Z}_i \boldsymbol{\Sigma}_b \mathbf{Z}_i^\top + \sigma^2 \mathbf{I}_{n_i}}_{\boldsymbol{\Sigma}_i}\right)$$
+
+      <p>
+        The marginal covariance $\boldsymbol{\Sigma}_i$ has a structured form: observations within
+        the same cluster are correlated through the random effects, while the $\sigma^2 \mathbf{I}$
+        term adds independent residual noise.
+      </p>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 2.3 — Random Intercept Model</div>
+        <p>
+          The simplest LMM: each cluster has a random intercept.
+          $\mathbf{z}_{ij} = 1$, $b_i \sim \mathrm{N}(0, \sigma_b^2)$:
+        </p>
+        $$Y_{ij} = \beta_0 + b_i + \beta_1 x_{ij} + \varepsilon_{ij}$$
+        <p>The marginal covariance within cluster $i$ is:</p>
+        $$\mathrm{Cov}(Y_{ij}, Y_{ik}) = \sigma_b^2, \quad \mathrm{Var}(Y_{ij}) = \sigma_b^2 + \sigma^2$$
+        <p>
+          The intraclass correlation (ICC) is $\rho = \sigma_b^2 / (\sigma_b^2 + \sigma^2)$.
+          This measures the proportion of total variance attributable to cluster-level differences.
+        </p>
+      </div>
+
+      <h3 id="re-vs-fe">Random Effects vs. Fixed Effects</h3>
+
+      <p>Why model cluster effects as <em>random</em> rather than as fixed dummy variables?</p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Aspect</th><th>Fixed Effects</th><th>Random Effects</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Parameters</td>
+              <td>One per cluster — $m$ extra parameters</td>
+              <td>Two: $\sigma_b^2$ and $\sigma^2$</td>
+            </tr>
+            <tr>
+              <td>Generalisation</td>
+              <td>Inference only about observed clusters</td>
+              <td>Inference about the <em>population</em> of clusters</td>
+            </tr>
+            <tr>
+              <td>Singletons</td>
+              <td>Cannot estimate effect for $n_i = 1$</td>
+              <td>Possible via shrinkage (BLUP)</td>
+            </tr>
+            <tr>
+              <td>Efficiency</td>
+              <td>Low when $m$ is large</td>
+              <td>Borrows strength across clusters (shrinkage)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="reml">Restricted Maximum Likelihood (REML)</h3>
+
+      <p>
+        Maximum likelihood estimation of variance components
+        $(\boldsymbol{\Sigma}_b, \sigma^2)$ is biased because it does not account for degrees
+        of freedom used in estimating $\boldsymbol{\beta}$. <strong>REML</strong> removes this
+        bias by maximising the likelihood of a set of <em>residual contrasts</em> that are
+        free of $\boldsymbol{\beta}$.
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 2.4 — REML Log-Likelihood</div>
+        <p>
+          Let $\mathbf{A}$ be an $(n - p) \times n$ matrix with rows spanning
+          $\{\mathbf{c} : \mathbf{c}^\top \mathbf{X} = \mathbf{0}\}$ (residual contrasts).
+          The REML log-likelihood is:
+        </p>
+        $$\ell_{\mathrm{REML}}(\boldsymbol{\Sigma}_b, \sigma^2) = \ell_{\mathrm{ML}}(\hat{\boldsymbol{\beta}}_{\mathrm{GLS}}, \boldsymbol{\Sigma}_b, \sigma^2) - \frac{1}{2}\log|\mathbf{X}^\top \boldsymbol{\Sigma}^{-1}\mathbf{X}|$$
+        <p>
+          where $\boldsymbol{\Sigma} = \mathrm{block\,diag}(\boldsymbol{\Sigma}_i)$ is the full
+          marginal covariance and $\hat{\boldsymbol{\beta}}_{\mathrm{GLS}}$ is the GLS estimator.
+        </p>
+      </div>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Important: REML and model comparison</div>
+        <p>
+          REML log-likelihoods can only be compared across models with the <em>same fixed-effects
+          structure</em>. To compare models with different fixed effects, use ML (set
+          <code>REML = FALSE</code> in <code>lmer</code>).
+        </p>
+      </div>
+
+      <h3 id="blup">Best Linear Unbiased Prediction (BLUP)</h3>
+
+      <p>
+        Random effects $\mathbf{b}_i$ are not parameters (they are random), but we can
+        <em>predict</em> them. The <strong>BLUP</strong> minimises mean squared prediction error
+        among all linear predictors:
+      </p>
+      $$\hat{\mathbf{b}}_i = \boldsymbol{\Sigma}_b \mathbf{Z}_i^\top \boldsymbol{\Sigma}_i^{-1}(\mathbf{y}_i - \mathbf{X}_i\hat{\boldsymbol{\beta}})$$
+
+      <p>This can be written in the illuminating form:</p>
+      $$\hat{\mathbf{b}}_i = \left(\mathbf{Z}_i^\top \mathbf{Z}_i / \sigma^2 + \boldsymbol{\Sigma}_b^{-1}\right)^{-1} \mathbf{Z}_i^\top (\mathbf{y}_i - \mathbf{X}_i\hat{\boldsymbol{\beta}}) / \sigma^2$$
+
+      <div class="callout note">
+        <div class="callout-title">💡 Shrinkage interpretation of BLUPs</div>
+        <p>
+          The BLUP shrinks the cluster-specific OLS estimate toward zero (the prior mean).
+          Clusters with few observations get shrunk <em>more</em>; clusters with many observations
+          get shrunk <em>less</em>. This is the <strong>Stein shrinkage</strong> phenomenon —
+          borrowing strength from the ensemble of clusters improves individual predictions.
+        </p>
+        <p>
+          Formally, if $\hat{\mathbf{b}}_i^{\mathrm{OLS}}$ is the OLS estimate for cluster $i$ alone,
+          then $\hat{\mathbf{b}}_i = \mathbf{S}_i \hat{\mathbf{b}}_i^{\mathrm{OLS}}$ where
+          $\mathbf{S}_i = (\mathbf{I} + \sigma^2(\mathbf{Z}_i^\top\mathbf{Z}_i)^{-1}\boldsymbol{\Sigma}_b^{-1})^{-1}$
+          is the shrinkage matrix.
+        </p>
+      </div>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 2.4 — Rat Growth LMM</div>
+        <div class="code-label">R</div>
+        <pre><code class="language-r">library(lme4)
+
+# Load rat growth data (nlme package)
+data(Rats, package = "nlme")
+
+# Random intercept only
+fit_ri <- lmer(weight ~ week + (1 | rat), data = Rats, REML = TRUE)
+
+# Random intercept + random slope
+fit_ris <- lmer(weight ~ week + (week | rat), data = Rats, REML = TRUE)
+
+# Compare models (use ML for fair comparison)
+fit_ri_ml  <- lmer(weight ~ week + (1 | rat),     data = Rats, REML = FALSE)
+fit_ris_ml <- lmer(weight ~ week + (week | rat),  data = Rats, REML = FALSE)
+anova(fit_ri_ml, fit_ris_ml)  # LRT
+
+# Model summary
+summary(fit_ris)
+
+# Extract BLUPs
+ranef(fit_ris)
+
+# Plot predicted trajectories per rat
+library(ggplot2)
+Rats$fitted_ris <- fitted(fit_ris)
+ggplot(Rats, aes(x = week, y = weight, group = rat)) +
+  geom_line(aes(colour = factor(rat)), alpha = 0.4) +
+  geom_line(aes(y = fitted_ris, colour = factor(rat)), linetype = 2) +
+  labs(title = "Rat weights: observed (solid) and LMM-fitted (dashed)")</code></pre>
+      </div>
+
+      <h3 id="bayesian-lmm">Bayesian Inference for LMMs — Gibbs Sampling</h3>
+
+      <p>
+        LMMs have a natural Bayesian interpretation: the random effects prior
+        $\mathbf{b}_i \sim \mathrm{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)$ is exactly a
+        <strong>hierarchical prior</strong>. Bayesian inference uses MCMC to sample from the
+        joint posterior $p(\boldsymbol{\beta}, \mathbf{b}, \boldsymbol{\Sigma}_b, \sigma^2 \mid \mathbf{y})$.
+      </p>
+
+      <p>
+        With conjugate priors, the <strong>Gibbs sampler</strong> cycles through
+        <em>full conditional</em> distributions in closed form:
+      </p>
+
+      <ol class="steps">
+        <li>
+          <strong>Update fixed effects:</strong>
+          $\boldsymbol{\beta} \mid \mathbf{y}, \mathbf{b}, \sigma^2 \sim \mathrm{N}(\hat{\boldsymbol{\beta}}_{\mathrm{GLS}}, \sigma^2(\mathbf{X}^\top\mathbf{X})^{-1})$
+        </li>
+        <li>
+          <strong>Update random effects:</strong> for each $i$,
+          $\mathbf{b}_i \mid \mathbf{y}_i, \boldsymbol{\beta}, \sigma^2, \boldsymbol{\Sigma}_b \sim \mathrm{N}(\hat{\mathbf{b}}_i^{\mathrm{BLUP}}, \boldsymbol{\Lambda}_i^{-1})$
+          where $\boldsymbol{\Lambda}_i = \mathbf{Z}_i^\top\mathbf{Z}_i/\sigma^2 + \boldsymbol{\Sigma}_b^{-1}$.
+        </li>
+        <li>
+          <strong>Update $\sigma^2$:</strong>
+          $\sigma^2 \mid \mathbf{y}, \boldsymbol{\beta}, \mathbf{b} \sim \mathrm{Inv-Gamma}(a + n/2, b + \mathrm{RSS}/2)$
+        </li>
+        <li>
+          <strong>Update $\boldsymbol{\Sigma}_b$:</strong>
+          $\boldsymbol{\Sigma}_b^{-1} \mid \mathbf{b} \sim \mathrm{Wishart}(\nu_0 + m, (\Psi_0 + \sum_i \mathbf{b}_i \mathbf{b}_i^\top)^{-1})$
+        </li>
+      </ol>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <h2 id="glmm">2.5 Generalised Linear Mixed Models (GLMMs)</h2>
+
+      <p>
+        GLMMs extend LMMs to non-normal responses (binary, count, etc.) by incorporating random
+        effects into the GLM framework.
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 2.5 — Generalised Linear Mixed Model (GLMM)</div>
+        <p>
+          For observations $Y_{ij}$ in cluster $i$, with random effects $\mathbf{b}_i \sim \mathrm{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)$:
+        </p>
+        $$Y_{ij} \mid \mathbf{b}_i \sim \mathrm{EF}(\mu_{ij}, \phi), \qquad g(\mu_{ij}) = \mathbf{x}_{ij}^\top \boldsymbol{\beta} + \mathbf{z}_{ij}^\top \mathbf{b}_i$$
+        <p>
+          where $g$ is a link function and EF denotes an exponential family distribution.
+        </p>
+      </div>
+
+      <h3 id="glmm-likelihood">The GLMM Likelihood — Why Integration Matters</h3>
+
+      <p>
+        The marginal log-likelihood of the observed data requires integrating out the random effects:
+      </p>
+      $$\ell(\boldsymbol{\beta}, \phi, \boldsymbol{\Sigma}_b) = \sum_{i=1}^m \log \int f(\mathbf{y}_i \mid \mathbf{b}_i; \boldsymbol{\beta}, \phi)\, \phi(\mathbf{b}_i; \boldsymbol{\Sigma}_b) \, d\mathbf{b}_i$$
+
+      <p>
+        For Gaussian $Y_{ij}$ this integral has a closed form. For Bernoulli or Poisson
+        responses, it generally does <em>not</em>. Three computational strategies exist:
+      </p>
+
+      <h3 id="ghq">Gaussian–Hermite Quadrature</h3>
+
+      <p>
+        For a scalar random effect $b_i \sim \mathrm{N}(0,\sigma_b^2)$, change variables
+        $u = b_i / (\sqrt{2}\sigma_b)$ and apply the Gauss–Hermite quadrature rule:
+      </p>
+      $$\int_{-\infty}^{\infty} h(u) e^{-u^2} du \approx \sum_{q=1}^Q w_q h(t_q)$$
+      <p>
+        where $t_q$ are the $Q$ quadrature points (roots of the $Q$-th Hermite polynomial) and
+        $w_q$ are the corresponding weights. This gives:
+      </p>
+      $$\int f(\mathbf{y}_i \mid b_i) \phi(b_i; \sigma_b^2) db_i \approx \frac{1}{\sqrt{\pi}} \sum_{q=1}^Q w_q f(\mathbf{y}_i \mid b_i = \sqrt{2}\sigma_b t_q)$$
+
+      <div class="callout note">
+        <div class="callout-title">💡 How many quadrature points?</div>
+        <p>
+          More quadrature points $Q$ gives higher accuracy but more computation.
+          $Q = 20$–$25$ is usually sufficient for moderate cluster sizes.
+          The accuracy degrades for large $\sigma_b$ (wide random effect distribution) and
+          for higher-dimensional $\mathbf{b}_i$ (the curse of dimensionality).
+        </p>
+      </div>
+
+      <h3 id="laplace">Laplace Approximation</h3>
+
+      <p>
+        The Laplace approximation applies a second-order Taylor expansion of the log-integrand
+        around its mode $\hat{\mathbf{b}}_i = \arg\max_{\mathbf{b}} [f(\mathbf{y}_i \mid \mathbf{b}_i) \phi(\mathbf{b}_i)]$:
+      </p>
+      $$\log \int f(\mathbf{y}_i \mid \mathbf{b}) \phi(\mathbf{b}) d\mathbf{b} \approx \log f(\mathbf{y}_i \mid \hat{\mathbf{b}}_i) + \log \phi(\hat{\mathbf{b}}_i) + \frac{q}{2}\log(2\pi) - \frac{1}{2}\log |\mathbf{H}_i|$$
+      <p>
+        where $\mathbf{H}_i$ is the Hessian of $-\log[f(\mathbf{y}_i \mid \mathbf{b}) \phi(\mathbf{b})]$
+        evaluated at $\hat{\mathbf{b}}_i$, and $q = \dim(\mathbf{b}_i)$.
+        The Laplace approximation is equivalent to 1-point Gaussian–Hermite quadrature at the mode.
+      </p>
+
+      <h3 id="pql">Penalised Quasi-Likelihood (PQL)</h3>
+
+      <p>
+        PQL linearises the GLMM around current estimates of the random effects and iteratively fits
+        an LMM. While fast and easy to implement, it is known to produce <em>biased</em> estimates
+        — especially for binary data with small cluster sizes. It should be avoided in applications
+        where accuracy matters.
+      </p>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 2.5 — GLMM for Toxoplasmosis (Individual Level)</div>
+        <p>
+          Model the binary infection status of individual $j$ in city $i$ with a random-intercept
+          logistic model:
+        </p>
+        $$\mathrm{logit}(P(\mathrm{infected}_{ij} = 1 \mid b_i)) = \beta_0 + \beta_1 \mathrm{Rainfall}_i + b_i, \qquad b_i \sim \mathrm{N}(0, \sigma_b^2)$$
+        <div class="code-label">R</div>
+        <pre><code class="language-r">library(lme4)
+
+# Simulate individual-level toxoplasmosis data
+# (or load from your dataset)
+set.seed(123)
+m <- 34       # cities
+ni <- 50      # individuals per city
+rainfall <- rnorm(m, 1800, 300)
+
+b_true <- rnorm(m, 0, 1)
+p <- plogis(-1 + 0.001 * rainfall[rep(1:m, each = ni)] +
+              b_true[rep(1:m, each = ni)])
+infected <- rbinom(m * ni, 1, p)
+city_id  <- rep(1:m, each = ni)
+toxo_df  <- data.frame(infected, rainfall = rainfall[city_id], city = factor(city_id))
+
+# Fit GLMM with Gauss-Hermite quadrature (nAGQ > 1)
+fit_glmm <- glmer(infected ~ scale(rainfall) + (1 | city),
+                  data = toxo_df,
+                  family = binomial,
+                  nAGQ = 25)   # 25-point GHQ
+
+summary(fit_glmm)
+VarCorr(fit_glmm)   # random effect variance</code></pre>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <h2 id="summary">Chapter Summary</h2>
+
+      <div class="key-points">
+        <h4>Key Points from Chapter 2</h4>
+        <ul>
+          <li>
+            <strong>Overdispersion</strong> (variance exceeds GLM prediction) can be handled by
+            quasi-likelihood (adds dispersion parameter $\phi$) or by switching to
+            Beta-Binomial / Negative Binomial distributions.
+          </li>
+          <li>
+            <strong>GEE</strong> provides population-averaged estimates robust to misspecification
+            of the working correlation structure; uses sandwich SE.
+          </li>
+          <li>
+            <strong>LMMs</strong> decompose variance into between-cluster ($\sigma_b^2$) and
+            within-cluster ($\sigma^2$) components. REML removes the bias in ML estimates of
+            variance components.
+          </li>
+          <li>
+            <strong>BLUPs</strong> are the optimal linear predictors of random effects; they
+            shrink cluster-specific estimates toward the population mean.
+          </li>
+          <li>
+            <strong>GLMMs</strong> extend LMMs to exponential family responses. The marginal
+            likelihood requires integration over random effects, solved by Gauss–Hermite
+            quadrature or the Laplace approximation.
+          </li>
+        </ul>
+      </div>
+
+      <div class="chapter-nav">
+        <a href="model-selection.html">
+          <span class="nav-label">← Previous</span>
+          <span class="nav-title">1 — Model Selection</span>
+        </a>
+        <a href="nonlinear.html" class="next">
+          <span class="nav-label">Next Chapter →</span>
+          <span class="nav-title">3 — Nonlinear Models</span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+</body>
+</html>

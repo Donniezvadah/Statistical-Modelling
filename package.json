@@ -1,0 +1,29 @@
+{
+  "name": "donnie-statistical-modelling",
+  "version": "1.0.0",
+  "description": "Donnie — Statistical Modelling: PDF generation and build tools",
+  "private": true,
+  "scripts": {
+    "pdf":         "node generate-pdfs.js",
+    "pdf:single":  "node generate-pdfs.js --page",
+    "pdf:merge":   "node generate-pdfs.js --merge",
+    "serve":       "npx serve . -p 3000",
+    "lint:html":   "npx html-validate '*.html'"
+  },
+  "dependencies": {
+    "puppeteer":   "^22.0.0",
+    "pdf-lib":     "^1.17.1",
+    "chalk":       "^5.3.0",
+    "commander":   "^12.0.0",
+    "ora":         "^8.0.1"
+  },
+  "devDependencies": {
+    "serve":       "^14.2.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["statistics", "modelling", "AIC", "BIC", "mixed-models", "EM"],
+  "author": "Donnie",
+  "license": "CC0-1.0"
+}

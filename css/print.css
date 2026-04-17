@@ -1,0 +1,142 @@
+/* ============================================================
+   Donnie — Statistical Modelling
+   Print / PDF Stylesheet
+   Loaded on every page via <link media="print">
+   Also injected by generate-pdfs.js for Puppeteer PDFs
+   ============================================================ */
+
+@media print {
+
+  /* ── Page setup ──────────────────────────────────────── */
+  @page {
+    size: A4;
+    margin: 22mm 20mm 18mm 20mm;
+  }
+
+  @page :first {
+    margin-top: 30mm;  /* extra breathing room on first page */
+  }
+
+  /* ── Running header / footer via CSS ─────────────────── */
+  /* (Puppeteer uses its own headerTemplate; this is a fallback
+      for browsers that support named string counter-style.) */
+
+  /* ── Hide interactive chrome ──────────────────────────── */
+  #site-header,
+  #sidebar,
+  #toc-sidebar,
+  #site-footer,
+  .chapter-nav,
+  #menu-toggle,
+  #theme-toggle,
+  details summary::before,      /* collapse arrows */
+  .header-btn { display: none !important; }
+
+  /* ── Layout: full-width single column ────────────────── */
+  #layout        { display: block !important; }
+  #main-content  { margin: 0 !important; }
+  .content-wrapper {
+    max-width:  100% !important;
+    padding:    0 !important;
+    width:      100% !important;
+  }
+
+  /* ── Expand all <details> so proofs are visible ─────── */
+  details { display: block !important; }
+  details[open] summary::before { content: '' !important; }
+
+  /* ── Typography ──────────────────────────────────────── */
+  body {
+    font-family: Georgia, 'Times New Roman', Times, serif !important;
+    font-size:   10.5pt !important;
+    line-height: 1.65  !important;
+    color:       #000  !important;
+    background:  white !important;
+  }
+
+  h1.page-title { font-size: 22pt  !important; margin-top: 0 !important; page-break-after: avoid; }
+  h2            { font-size: 14pt  !important; page-break-after: avoid; }
+  h3            { font-size: 12pt  !important; page-break-after: avoid; }
+  h4            { font-size: 11pt  !important; page-break-after: avoid; }
+  p             { orphans: 3; widows: 3; }
+
+  /* ── Code blocks ─────────────────────────────────────── */
+  pre, code {
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size:   8.5pt  !important;
+    line-height: 1.45   !important;
+    background:  #f8f8f8 !important;
+    border:      1px solid #ddd !important;
+    color:       #1a1a1a !important;
+  }
+  pre { padding: 8pt 10pt !important; }
+  code { padding: 1pt 3pt !important; }
+
+  /* ── Math (MathJax SVG output renders well in print) ─── */
+  mjx-container { color: #000 !important; }
+
+  /* ── Callout boxes ───────────────────────────────────── */
+  .callout {
+    border:      1px solid #ccc !important;
+    background:  #fafafa       !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .callout.theorem    { border-left: 5px solid #16a34a !important; background: #f0fdf4 !important; }
+  .callout.definition { border-left: 5px solid #7c3aed !important; background: #f5f3ff !important; }
+  .callout.example    { border-left: 5px solid #ca8a04 !important; background: #fefce8 !important; }
+  .callout.proof      { border-left: 5px solid #94a3b8 !important; background: #fafaf9 !important; }
+  .callout.note       { border-left: 5px solid #2563eb !important; background: #eff6ff !important; }
+  .callout.warning    { border-left: 5px solid #d97706 !important; background: #fffbeb !important; }
+  .callout.solution   { border-left: 5px solid #16a34a !important; background: #f0fdf4 !important; }
+
+  /* ── Tables ──────────────────────────────────────────── */
+  .table-wrapper { page-break-inside: avoid; break-inside: avoid; }
+  table { width: 100% !important; border-collapse: collapse !important; font-size: 9.5pt !important; }
+  th    { background: #f0f0f0 !important; color: #000 !important; border: 1px solid #ccc !important; padding: 5pt 7pt !important; }
+  td    { border: 1px solid #ddd !important; padding: 4pt 7pt !important; color: #000 !important; }
+
+  /* ── Key points box ──────────────────────────────────── */
+  .key-points {
+    background:   #f0f0f0 !important;
+    border:       1px solid #bbb !important;
+    border-top:   3px solid #2563eb !important;
+    page-break-inside: avoid;
+  }
+
+  /* ── Page breaks ─────────────────────────────────────── */
+  h2[id] { page-break-before: auto; }
+  .callout, pre, figure, .table-wrapper, blockquote {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* ── Links: show URL in parens ───────────────────────── */
+  a[href^="http"]::after  { content: " (" attr(href) ")"; font-size: 8pt; color: #555; }
+  a[href^="./"]::after    { content: ''; }   /* suppress local links */
+  a[href^="#"]::after     { content: ''; }   /* suppress anchor links */
+
+  /* ── Remove shadows / transitions ───────────────────── */
+  * { box-shadow: none !important; text-shadow: none !important; transition: none !important; }
+
+  /* ── Chapter meta badges ─────────────────────────────── */
+  .chapter-meta { margin-bottom: 6pt !important; }
+  .chapter-badge, .chapter-tag {
+    border: 1px solid #999 !important;
+    background: #eee !important;
+    color: #000 !important;
+    font-size: 8pt !important;
+    padding: 1pt 5pt !important;
+  }
+
+  /* ── Steps list ─────────────────────────────────────── */
+  .steps li::before {
+    background: #444 !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Force background colours to print ─────────────────── */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

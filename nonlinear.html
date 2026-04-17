@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter 3: Nonlinear Models — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams',
+        macros: {
+          bbeta:'\\boldsymbol{\\beta}', btheta:'\\boldsymbol{\\theta}',
+          bb:'\\mathbf{b}', bx:'\\mathbf{x}', bY:'\\mathbf{Y}',
+          bZ:'\\mathbf{Z}', bSigma:'\\boldsymbol{\\Sigma}',
+          E:'\\mathbb{E}', Var:'\\mathrm{Var}'
+        }
+      },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="nonlinear">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Chapter 3</span>
+        <span class="chapter-tag">Nonlinear Models</span>
+        <span class="chapter-tag">NLS · NLME · GNLMM</span>
+      </div>
+
+      <h1 class="page-title">Nonlinear Models</h1>
+      <p class="page-subtitle">When a straight line — or even a polynomial — is not enough</p>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="motivation">3.1 Motivation: Why Go Nonlinear?</h2>
+
+      <p>
+        In all the models we have encountered so far, the expected response is a
+        <em>linear</em> function of parameters: $\mathbb{E}[Y] = \mathbf{x}^\top \boldsymbol{\beta}$,
+        possibly after a link transformation. While flexible (polynomials, splines, interactions),
+        this linearity imposes a structure that may not reflect the underlying science.
+      </p>
+
+      <p>
+        Consider biological growth, pharmacokinetics (drug absorption and elimination),
+        enzyme kinetics, or chemical reactions. These processes are governed by
+        <em>differential equations</em> whose solutions are inherently nonlinear — exponential
+        saturation, sigmoidal growth, double-exponential decline. Forcing these into a
+        linear framework requires many parameters, produces physically uninterpretable
+        coefficients, and often gives poor fits.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">💡 Physical vs. empirical parameters</div>
+        <p>
+          A key advantage of nonlinear models is that their parameters often carry direct
+          physical meaning:
+        </p>
+        <ul>
+          <li><strong>Physical (mechanistic) parameters:</strong> directly interpretable quantities
+          such as asymptotic level, half-life, rate constant, or carrying capacity.</li>
+          <li><strong>Tuning (empirical) parameters:</strong> improve model fit but lack
+          direct scientific interpretation (e.g., a 7th-degree polynomial coefficient).</li>
+        </ul>
+        <p>
+          Using physical parameters makes models more interpretable, reduces the number of
+          parameters needed, and allows prior information to be incorporated naturally.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="nlr">3.2 Nonlinear Regression with Fixed Effects</h2>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 3.1 — Nonlinear Regression Model</div>
+        <p>
+          Given responses $y_1, \ldots, y_n$ and covariates $x_1, \ldots, x_n$, the
+          <strong>nonlinear regression model</strong> specifies:
+        </p>
+        $$Y_i = \eta(x_i, \boldsymbol{\beta}) + \varepsilon_i, \qquad \varepsilon_i \overset{\mathrm{i.i.d.}}{\sim} \mathrm{N}(0, \sigma^2)$$
+        <p>
+          where $\eta(\cdot, \boldsymbol{\beta})$ is a <strong>known nonlinear function</strong>
+          of $\boldsymbol{\beta} \in \mathbb{R}^p$. The function $\eta$ encodes the
+          mathematical structure of the mean response.
+        </p>
+      </div>
+
+      <h3 id="nls-estimation">Estimation: Nonlinear Least Squares</h3>
+
+      <p>
+        Under the normality assumption, maximising the log-likelihood is equivalent to
+        <strong>nonlinear least squares (NLS)</strong> — minimising:
+      </p>
+      $$S(\boldsymbol{\beta}) = \sum_{i=1}^n (y_i - \eta(x_i, \boldsymbol{\beta}))^2$$
+
+      <p>
+        Unlike ordinary least squares, there is no closed-form solution. We must use
+        iterative optimisation. The most widely used method is
+        <strong>Gauss–Newton</strong>.
+      </p>
+
+      <h3 id="gauss-newton">The Gauss–Newton Algorithm — Step by Step</h3>
+
+      <p>
+        The Gauss–Newton algorithm linearises the model at the current parameter estimate
+        and takes an ordinary least squares step.
+      </p>
+
+      <ol class="steps">
+        <li>
+          <strong>Initialise:</strong> Choose a starting value $\boldsymbol{\beta}^{(0)}$
+          (good starting values are crucial — see below).
+        </li>
+        <li>
+          <strong>Linearise:</strong> Compute the residuals
+          $r_i^{(t)} = y_i - \eta(x_i, \boldsymbol{\beta}^{(t)})$ and the
+          <em>Jacobian matrix</em>
+          $$\mathbf{J}^{(t)}, \quad J_{ij}^{(t)} = \frac{\partial \eta(x_i, \boldsymbol{\beta})}{\partial \beta_j}\Bigg|_{\boldsymbol{\beta} = \boldsymbol{\beta}^{(t)}}$$
+          This is the $n \times p$ matrix of partial derivatives.
+        </li>
+        <li>
+          <strong>Update:</strong> Solve the linearised OLS problem:
+          $$\boldsymbol{\beta}^{(t+1)} = \boldsymbol{\beta}^{(t)} + (\mathbf{J}^{(t)\top} \mathbf{J}^{(t)})^{-1} \mathbf{J}^{(t)\top} \mathbf{r}^{(t)}$$
+        </li>
+        <li>
+          <strong>Check convergence:</strong> Stop when
+          $\|S(\boldsymbol{\beta}^{(t+1)}) - S(\boldsymbol{\beta}^{(t)})\| < \epsilon$
+          or $\|\boldsymbol{\beta}^{(t+1)} - \boldsymbol{\beta}^{(t)}\| < \delta$.
+        </li>
+      </ol>
+
+      <div class="callout note">
+        <div class="callout-title">💡 Why good starting values matter so much</div>
+        <p>
+          Unlike linear regression, $S(\boldsymbol{\beta})$ may have many <em>local</em> minima.
+          Gauss–Newton will converge to whichever local minimum is nearest to the starting point.
+          Strategies for good starts:
+        </p>
+        <ul>
+          <li>Use physical knowledge of parameter ranges</li>
+          <li>Plot $\eta(x, \boldsymbol{\beta})$ for candidate values and match visually</li>
+          <li>Use <code>getInitial()</code> in R, which provides self-starting functions for common models</li>
+          <li>Grid search over a coarse parameter space first</li>
+        </ul>
+      </div>
+
+      <h3 id="nls-inference">Inference for NLS</h3>
+
+      <p>
+        Let $\hat{\boldsymbol{\beta}}$ be the NLS estimator and
+        $\hat{\mathbf{J}} = \mathbf{J}(\hat{\boldsymbol{\beta}})$ the Jacobian at the solution.
+        Under standard regularity conditions:
+      </p>
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 3.1 — Asymptotic Distribution of NLS Estimator</div>
+        <p>As $n \to \infty$:</p>
+        $$\sqrt{n}(\hat{\boldsymbol{\beta}} - \boldsymbol{\beta}_0) \overset{d}{\to} \mathrm{N}\!\left(\mathbf{0},\, \sigma^2 \left(\mathbf{J}^\top \mathbf{J}/n\right)^{-1}\right)$$
+        <p>In practice, estimate $\sigma^2$ by $\hat{\sigma}^2 = S(\hat{\boldsymbol{\beta}})/(n-p)$ and the covariance by:</p>
+        $$\widehat{\mathrm{Var}}(\hat{\boldsymbol{\beta}}) = \hat{\sigma}^2 (\hat{\mathbf{J}}^\top \hat{\mathbf{J}})^{-1}$$
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof sketch of Theorem 3.1</summary>
+        <div class="proof-body">
+          <p>
+            The NLS estimator satisfies $\hat{\mathbf{J}}^\top (\mathbf{y} - \eta(\hat{\boldsymbol{\beta}})) = \mathbf{0}$
+            (first-order conditions). Taylor-expand around the true $\boldsymbol{\beta}_0$:
+          </p>
+          $$\mathbf{0} \approx \mathbf{J}_0^\top (\mathbf{y} - \eta(\boldsymbol{\beta}_0)) - \mathbf{J}_0^\top \mathbf{J}_0 (\hat{\boldsymbol{\beta}} - \boldsymbol{\beta}_0)$$
+          <p>Rearranging:</p>
+          $$\hat{\boldsymbol{\beta}} - \boldsymbol{\beta}_0 \approx (\mathbf{J}_0^\top \mathbf{J}_0)^{-1} \mathbf{J}_0^\top \boldsymbol{\varepsilon}$$
+          <p>
+            Since $\boldsymbol{\varepsilon} \sim \mathrm{N}(\mathbf{0}, \sigma^2\mathbf{I})$, this gives
+            $\hat{\boldsymbol{\beta}} - \boldsymbol{\beta}_0 \sim \mathrm{N}(\mathbf{0}, \sigma^2(\mathbf{J}_0^\top\mathbf{J}_0)^{-1})$
+            exactly in the linearised model, and approximately in general.
+          </p>
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <h3 id="common-models">Catalogue of Common Nonlinear Mean Functions</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Formula $\eta(x, \boldsymbol{\beta})$</th><th>Application</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Exponential saturation</td>
+              <td>$\beta_0(1 - e^{-x/\beta_1})$</td>
+              <td>Calcium uptake, nutrient absorption</td>
+            </tr>
+            <tr>
+              <td>Exponential decay</td>
+              <td>$\beta_0 e^{-\beta_1 x}$</td>
+              <td>Drug clearance, radioactive decay</td>
+            </tr>
+            <tr>
+              <td>Michaelis–Menten</td>
+              <td>$\beta_0 x / (\beta_1 + x)$</td>
+              <td>Enzyme kinetics, receptor binding</td>
+            </tr>
+            <tr>
+              <td>Logistic growth</td>
+              <td>$\beta_0 / (1 + e^{-\beta_1(x - \beta_2)})$</td>
+              <td>Population growth, dose-response</td>
+            </tr>
+            <tr>
+              <td>Gompertz</td>
+              <td>$\beta_0 e^{-e^{-\beta_1(x-\beta_2)}}$</td>
+              <td>Tumour growth, bacterial growth</td>
+            </tr>
+            <tr>
+              <td>4-parameter logistic (4PL)</td>
+              <td>$\beta_0 + (\beta_1-\beta_0)/(1+(x/\beta_2)^{\beta_3})$</td>
+              <td>ELISA assays, immunoassays</td>
+            </tr>
+            <tr>
+              <td>Power law</td>
+              <td>$\beta_0 x^{\beta_1}$</td>
+              <td>Allometric scaling, fractal growth</td>
+            </tr>
+            <tr>
+              <td>Double exponential</td>
+              <td>$\beta_0(e^{-\beta_1 x} - e^{-\beta_2 x})$</td>
+              <td>Pharmacokinetics (absorption + elimination)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 3.1 — Calcium Uptake in Cells</div>
+        <p>
+          Calcium uptake (nmoles/mg) was measured at $n = 27$ time points (minutes) for individual
+          cells. The underlying mechanism: calcium flows into the cell at a rate proportional to
+          the remaining capacity, giving the ODE
+          $\mathrm{d}U/\mathrm{d}t = \beta_0/\beta_1 \cdot e^{-t/\beta_1}$,
+          with solution $U(t) = \beta_0(1 - e^{-t/\beta_1})$.
+          So $\beta_0$ = asymptotic uptake, $\beta_1$ = time constant.
+        </p>
+        <div class="code-label">R</div>
+        <pre><code class="language-r">library(nlme)
+data(calcium)   # 27 observations: time (x), uptake (y)
+
+# Fit nonlinear model using nls()
+fit_nls <- nls(uptake ~ beta0 * (1 - exp(-time / beta1)),
+               data = calcium,
+               start = list(beta0 = 5, beta1 = 2))
+
+summary(fit_nls)
+# Confidence intervals
+confint(fit_nls)
+
+# Compare with linear and quadratic models
+fit_lin  <- lm(uptake ~ time,               data = calcium)
+fit_quad <- lm(uptake ~ time + I(time^2),   data = calcium)
+
+# AIC comparison
+AIC(fit_lin, fit_quad, fit_nls)
+# Nonlinear model wins: fewer params, better physical interpretation
+
+# Plot fitted curve
+curve_data <- data.frame(time = seq(0, max(calcium$time), length.out = 200))
+curve_data$fitted <- predict(fit_nls, newdata = curve_data)
+
+plot(calcium$time, calcium$uptake, pch = 16,
+     xlab = "Time (min)", ylab = "Calcium Uptake (nmol/mg)",
+     main = "Calcium uptake: NLS fit")
+lines(curve_data$time, curve_data$fitted, col = "steelblue", lwd = 2)</code></pre>
+        <p>
+          The nonlinear model achieves a better AIC than both the linear and quadratic
+          alternatives while using only 2 parameters instead of 3. The parameter
+          $\hat{\beta}_1$ (the time constant) has direct physical meaning: it is the
+          time at which approximately 63% of the asymptotic uptake is achieved.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="nlme">3.3 Nonlinear Mixed Effects Models</h2>
+
+      <p>
+        In many applications, several individuals (subjects, animals, plants) are each
+        measured repeatedly over time or over a range of covariate values.
+        A single nonlinear curve fitted to all observations will miss the
+        <em>between-subject variability</em>. The solution: allow the parameters
+        $\boldsymbol{\beta}$ to vary randomly across individuals.
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 3.2 — Nonlinear Mixed Effects Model (NLME)</div>
+        <p>
+          For observations $Y_{ij}$ in cluster $i$ ($i = 1,\ldots,m$; $j = 1,\ldots,n_i$):
+        </p>
+        $$Y_{ij} = \eta(\boldsymbol{\beta} + \mathbf{b}_i,\, x_{ij}) + \varepsilon_{ij}$$
+        <p>where:</p>
+        <ul>
+          <li>$\eta(\cdot, x)$ is a nonlinear function of both parameters and covariate $x$</li>
+          <li>$\boldsymbol{\beta}$ — population-level (fixed) parameters</li>
+          <li>$\mathbf{b}_i \sim \mathrm{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)$ — subject-specific random deviations</li>
+          <li>$\varepsilon_{ij} \sim \mathrm{N}(0, \sigma^2)$ — within-subject noise, independent of $\mathbf{b}_i$</li>
+        </ul>
+        <p>
+          Subject $i$ has an individual parameter vector $\boldsymbol{\beta}_i = \boldsymbol{\beta} + \mathbf{b}_i$.
+        </p>
+      </div>
+
+      <h3 id="nlme-partial">Partial Random Effects</h3>
+
+      <p>
+        It is often scientifically justified to allow only a <em>subset</em> of parameters to
+        vary across subjects. For instance, in pharmacokinetics the absorption rate may be
+        relatively constant across patients while clearance varies substantially.
+        This is accommodated by a selection matrix $\mathbf{A}$ ($p \times q$, $q \leq p$):
+      </p>
+      $$Y_{ij} = \eta(\boldsymbol{\beta} + \mathbf{A}\mathbf{b}_i,\, x_{ij}) + \varepsilon_{ij}, \qquad \mathbf{b}_i \sim \mathrm{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)$$
+      <p>
+        where $\mathbf{A}$ has entries $0$ or $1$ selecting which parameters have random variation.
+      </p>
+
+      <h3 id="nlme-logscale">Log-Scale Parameterisation</h3>
+
+      <p>
+        Many physical parameters are constrained to be positive (rates, concentrations,
+        half-lives). To ensure positivity and improve numerical behaviour, work on the log scale:
+      </p>
+      $$\gamma_k = \log \beta_k, \quad \boldsymbol{\gamma} = \log \boldsymbol{\beta}$$
+      <p>
+        Then $\boldsymbol{\gamma}_i = \boldsymbol{\gamma} + \mathbf{b}_i$ with
+        $\mathbf{b}_i \sim \mathrm{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)$
+        implies $\boldsymbol{\beta}_i = \exp(\boldsymbol{\gamma}_i)$ follows a log-normal
+        distribution. This is standard in pharmacokinetic modelling.
+      </p>
+
+      <h3 id="nlme-estimation">Estimation</h3>
+
+      <p>
+        The marginal likelihood for NLMEs requires integrating out random effects:
+        $$\ell(\boldsymbol{\gamma}, \boldsymbol{\Sigma}_b, \sigma^2) = \sum_{i=1}^m \log \int f(\mathbf{y}_i \mid \mathbf{b}_i; \boldsymbol{\gamma}, \sigma^2) \, \phi(\mathbf{b}_i; \boldsymbol{\Sigma}_b) \, d\mathbf{b}_i$$
+      </p>
+      <p>
+        Since $Y_{ij} \mid \mathbf{b}_i$ is normal (not just exponential family), a Laplace
+        approximation works very well. The <code>nlme</code> and <code>nlmer</code> functions in R
+        implement this via adaptive Gaussian quadrature or Laplace.
+      </p>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 3.2 — Theophylline Pharmacokinetics</div>
+        <p>
+          Theophylline is a drug used to treat asthma. After oral administration of dose $D$,
+          plasma concentration follows a one-compartment model with first-order absorption and
+          elimination:
+        </p>
+        $$\eta(\boldsymbol{\beta}, D, t) = \frac{D \beta_1 \beta_2}{\beta_3(\beta_2 - \beta_1)} \left(e^{-\beta_1 t} - e^{-\beta_2 t}\right)$$
+        <p>where:</p>
+        <ul>
+          <li>$\beta_1$ — elimination rate constant (h$^{-1}$)</li>
+          <li>$\beta_2$ — absorption rate constant (h$^{-1}$)</li>
+          <li>$\beta_3$ — apparent clearance (L/h)</li>
+        </ul>
+        <p>
+          Data: 12 subjects, each measured at 11 time points. Each subject receives dose $D = 320$mg.
+        </p>
+        <div class="code-label">R</div>
+        <pre><code class="language-r">library(nlme)
+library(lme4)
+
+data(Theoph)  # Built into R
+
+# ── Step 1: Fit fixed-effects NLS (ignores clustering) ──────────────
+pk_model <- function(D, t, b1, b2, b3) {
+  D * b1 * b2 / (b3 * (b2 - b1)) * (exp(-b1 * t) - exp(-b2 * t))
+}
+
+fit_nls <- nls(conc ~ pk_model(dose, Time, exp(g1), exp(g2), exp(g3)),
+               data   = Theoph,
+               start  = list(g1 = log(0.08), g2 = log(1.5), g3 = log(0.04)))
+
+# ── Step 2: Diagnose clustering ──────────────────────────────────────
+Theoph$resid_nls <- residuals(fit_nls)
+# Plot residuals by subject — should see consistent patterns
+library(ggplot2)
+ggplot(Theoph, aes(x = Time, y = resid_nls, group = Subject, colour = Subject)) +
+  geom_line() + geom_point() +
+  labs(title = "NLS residuals: between-subject patterns indicate mixed model is needed")
+
+# ── Step 3: Fit NLME — all three parameters vary by subject ─────────
+pk_nlme <- nlme(conc ~ pk_model(dose, Time, exp(g1+b1), exp(g2+b2), exp(g3+b3)),
+                data   = groupedData(conc ~ Time | Subject, data = Theoph),
+                fixed  = g1 + g2 + g3 ~ 1,
+                random = g1 + g2 + g3 ~ 1,
+                start  = fixef(fit_nls))
+
+# ── Step 4: Simpler NLME — only elimination and clearance vary ───────
+pk_nlme_simple <- nlme(conc ~ pk_model(dose, Time, exp(g1+b1), exp(g2), exp(g3+b3)),
+                       data   = groupedData(conc ~ Time | Subject, data = Theoph),
+                       fixed  = g1 + g2 + g3 ~ 1,
+                       random = g1 + g3 ~ 1,
+                       start  = fixef(fit_nls))
+
+# Compare by BIC (use ML)
+AIC(pk_nlme, pk_nlme_simple)
+BIC(pk_nlme, pk_nlme_simple)</code></pre>
+        <p>
+          BIC typically favours the simpler model where only elimination rate ($\beta_1$) and
+          clearance ($\beta_3$) have random effects. The absorption rate $\beta_2$ does not
+          vary significantly between subjects — a biologically sensible conclusion.
+        </p>
+      </div>
+
+      <h3 id="nlme-prediction">Individual vs. Population Predictions</h3>
+
+      <p>
+        An NLME model gives two types of predictions:
+      </p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Prediction type</th><th>Parameters used</th><th>Formula</th><th>Use case</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Population prediction</strong></td>
+              <td>Fixed effects only</td>
+              <td>$\hat{Y}_{ij}^{\mathrm{pop}} = \eta(\hat{\boldsymbol{\gamma}}, x_{ij})$</td>
+              <td>Predict a new, unobserved subject</td>
+            </tr>
+            <tr>
+              <td><strong>Individual prediction</strong></td>
+              <td>Fixed + random effects</td>
+              <td>$\hat{Y}_{ij}^{\mathrm{ind}} = \eta(\hat{\boldsymbol{\gamma}} + \hat{\mathbf{b}}_i, x_{ij})$</td>
+              <td>Predict for an observed subject with data</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="gnlmm">3.4 Generalised Nonlinear Mixed Effects Models (GNLMMs)</h2>
+
+      <p>
+        Combining everything so far, we arrive at the most general model in this hierarchy:
+        non-normal responses (exponential family) with a <em>nonlinear</em> mean function
+        and random effects.
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 3.3 — Generalised Nonlinear Mixed Effects Model</div>
+        <p>
+          For cluster $i$, observation $j$, with random effects $\mathbf{b}_i \sim \mathrm{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)$:
+        </p>
+        $$Y_{ij} \mid \mathbf{b}_i \sim \mathrm{EF}(\mu_{ij}, \phi), \qquad g(\mu_{ij}) = \eta(\boldsymbol{\beta} + \mathbf{A}\mathbf{b}_i,\, x_{ij})$$
+        <p>
+          where $g$ is a link function, EF is exponential family, and $\eta$ is a known nonlinear
+          function (not necessarily a linear predictor).
+        </p>
+      </div>
+
+      <h3 id="gnlmm-hierarchy">Model Hierarchy</h3>
+
+      <p>
+        The GNLMM is the most general class we study. All previously encountered models are
+        special cases, obtained by appropriate restrictions:
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">📐 The complete model hierarchy</div>
+        <pre style="background:none;border:none;padding:0;font-family:var(--font-mono);font-size:0.875rem;">
+GNLMM:  Y|b ~ EF(μ),  g(μ) = η(β+Ab, x)
+  │
+  ├─ Set b=0:          Generalised Nonlinear Model (GNM)
+  │   ├─ Set g=identity:  Nonlinear Regression (NLS)
+  │   └─ Set η(β,x)=x'β:  GLM
+  │
+  ├─ Set η(β,x)=x'β+z'b:  GLMM
+  │   └─ Set EF=Normal:    LMM
+  │       └─ Set b=0:       Linear Model
+  │
+  └─ Set EF=Normal:    NLME
+        </pre>
+      </div>
+
+      <h3 id="gnlmm-challenges">Practical Challenges</h3>
+
+      <p>
+        GNLMMs present several difficulties that are active areas of research:
+      </p>
+
+      <ol>
+        <li>
+          <strong>No closed-form likelihood.</strong> Integration over $\mathbf{b}_i$ is required.
+          Gauss–Hermite quadrature becomes expensive for $\dim(\mathbf{b}_i) > 2$–$3$.
+          Laplace approximation may be inaccurate when the random effect distribution is
+          non-Gaussian or heavy-tailed.
+        </li>
+        <li>
+          <strong>Non-convex optimisation.</strong> Unlike GLMs, the nonlinear mean function can
+          create a non-concave log-likelihood with multiple local maxima. Good starting values
+          and multiple restarts are essential.
+        </li>
+        <li>
+          <strong>Numerically defined $\eta$.</strong> When $\eta$ is defined implicitly via
+          an ODE system (common in pharmacokinetics), each gradient evaluation requires solving
+          the ODE — very expensive.
+        </li>
+        <li>
+          <strong>Identifiability.</strong> Some parameters may not be identifiable from the data
+          alone (e.g., if $\beta_1$ and $\beta_2$ enter $\eta$ only through their difference).
+        </li>
+      </ol>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 3.3 — GNLMM for Binary Dose-Response</div>
+        <p>
+          In a drug trial, binary response (success/failure) varies with dose $x_{ij}$.
+          A 4-parameter logistic (4PL) model is more biologically realistic than a simple
+          logistic regression:
+        </p>
+        $$P(Y_{ij} = 1 \mid b_i) = \frac{\beta_0 + b_i}{\left(1 + (x_{ij}/\beta_2)^{\beta_3}\right)} \cdot \beta_1$$
+        <div class="code-label">R</div>
+        <pre><code class="language-r">library(lme4)
+
+# Simulate 4PL dose-response data
+set.seed(2024)
+m <- 20; ni <- 15
+dose <- rep(10^seq(-2, 2, length.out = ni), m)
+subject <- rep(1:m, each = ni)
+
+b <- rnorm(m, 0, 0.3)
+beta0 <- 0.05; beta1 <- 0.95; beta2 <- 1; beta3 <- 2
+
+mu <- beta0 + (beta1 - beta0) /
+  (1 + (dose / beta2)^beta3) + b[subject]
+mu <- pmin(pmax(mu, 0.001), 0.999)
+y  <- rbinom(m * ni, 1, mu)
+df <- data.frame(y, dose, subject = factor(subject))
+
+# Fit GLMM with logistic link (approximation to 4PL)
+fit_glmm <- glmer(y ~ log(dose) + I(log(dose)^2) + (1|subject),
+                  data = df, family = binomial, nAGQ = 15)
+summary(fit_glmm)</code></pre>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="model-selection-nlr">3.5 Model Selection for Nonlinear Models</h2>
+
+      <p>
+        The same principles from Chapter 1 apply to nonlinear models, but with some important
+        subtleties.
+      </p>
+
+      <h3 id="aic-nls">AIC and BIC for NLS</h3>
+
+      <p>
+        For a normal-errors nonlinear model with $p$ parameters and $\hat{\sigma}^2 = S(\hat{\boldsymbol{\beta}})/n$:
+      </p>
+      $$\ell(\hat{\boldsymbol{\beta}}, \hat{\sigma}^2) = -\frac{n}{2}\log(2\pi\hat{\sigma}^2) - \frac{n}{2}$$
+      $$\mathrm{AIC} = 2(p+1) - 2\ell(\hat{\boldsymbol{\beta}}, \hat{\sigma}^2) = n\log(\hat{\sigma}^2) + 2(p+1) + \mathrm{const}$$
+
+      <p>
+        The $+1$ accounts for the estimated $\sigma^2$. In R, <code>AIC(fit_nls)</code>
+        handles this automatically.
+      </p>
+
+      <h3 id="profile-likelihood">Profile Likelihood and Confidence Regions</h3>
+
+      <p>
+        Standard Wald intervals (± 1.96 SE) can be badly asymmetric for nonlinear parameters.
+        <strong>Profile likelihood intervals</strong> are more reliable:
+      </p>
+      $$\mathrm{CI}_{1-\alpha}(\beta_k) = \left\{\beta_k : 2[\ell(\hat{\boldsymbol{\beta}}) - \ell_p(\beta_k)] \leq \chi^2_{1, 1-\alpha}\right\}$$
+      <p>
+        where $\ell_p(\beta_k) = \max_{\boldsymbol{\beta}_{-k}} \ell(\boldsymbol{\beta})$
+        is the profile log-likelihood.
+        In R: <code>confint(fit_nls)</code> computes profile likelihood intervals.
+      </p>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <h2 id="summary">Chapter Summary</h2>
+
+      <div class="key-points">
+        <h4>Key Points from Chapter 3</h4>
+        <ul>
+          <li>
+            Nonlinear regression $Y_i = \eta(x_i, \boldsymbol{\beta}) + \varepsilon_i$ is
+            appropriate when the mean function is known to be nonlinear from scientific principles.
+          </li>
+          <li>
+            Estimation uses <strong>nonlinear least squares</strong> (Gauss–Newton), which
+            requires good starting values and may converge to local minima.
+          </li>
+          <li>
+            Asymptotic inference is based on the Jacobian matrix $\mathbf{J}$ evaluated at
+            $\hat{\boldsymbol{\beta}}$; profile likelihood intervals are preferred over Wald
+            intervals for potentially skewed sampling distributions.
+          </li>
+          <li>
+            <strong>NLMEs</strong> extend nonlinear regression to clustered data by adding
+            subject-specific random deviations $\mathbf{b}_i \sim \mathrm{N}(\mathbf{0}, \boldsymbol{\Sigma}_b)$.
+          </li>
+          <li>
+            Log-scale parameterisation ensures positivity and stabilises the optimisation.
+          </li>
+          <li>
+            The GNLMM is the most general model in the hierarchy, nesting GLMs, LMMs, NLMEs,
+            and GLMMs as special cases.
+          </li>
+        </ul>
+      </div>
+
+      <div class="chapter-nav">
+        <a href="beyond-glms.html">
+          <span class="nav-label">← Previous</span>
+          <span class="nav-title">2 — Beyond GLMs</span>
+        </a>
+        <a href="latent.html" class="next">
+          <span class="nav-label">Next Chapter →</span>
+          <span class="nav-title">4 — Latent Variables</span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+</body>
+</html>

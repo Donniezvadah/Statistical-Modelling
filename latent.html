@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter 4: Latent Variables — Donnie: Statistical Modelling</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/print.css" media="print" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$']], displayMath: [['$$','$$']], tags: 'ams',
+        macros: {
+          bbeta:'\\boldsymbol{\\beta}', btheta:'\\boldsymbol{\\theta}',
+          bpi:'\\boldsymbol{\\pi}', bmu:'\\boldsymbol{\\mu}',
+          by:'\\mathbf{y}', bu:'\\mathbf{u}',
+          E:'\\mathbb{E}', Var:'\\mathrm{Var}', P:'\\mathbb{P}'
+        }
+      },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body data-page="latent">
+
+<header id="site-header">
+  <button id="menu-toggle" class="header-btn">☰ Menu</button>
+  <a href="index.html" class="logo">
+    <span class="logo-badge">SM</span>
+    <span class="logo-title">Statistical Modelling</span>
+  </a>
+  <span class="spacer"></span>
+  <button onclick="window.print()" class="header-btn">⬇ Save PDF</button>
+  <button id="theme-toggle" class="header-btn">☾ Dark</button>
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+
+  <main id="main-content">
+    <div class="content-wrapper">
+
+      <div class="chapter-meta">
+        <span class="chapter-badge">Chapter 4</span>
+        <span class="chapter-tag">Latent Variables</span>
+        <span class="chapter-tag">Mixture Models · EM Algorithm · Factor Analysis</span>
+      </div>
+
+      <h1 class="page-title">Latent Variables</h1>
+      <p class="page-subtitle">Modelling what cannot be directly observed — and computing with it efficiently</p>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="intro">4.1 What Is a Latent Variable?</h2>
+
+      <p>
+        A <strong>latent variable</strong> $U$ is a random variable that is
+        <em>not directly observed</em> but influences the distribution of the observed
+        data $Y$. Latent variables arise in at least three distinct ways:
+      </p>
+
+      <ol>
+        <li>
+          <strong>Genuinely hidden phenomena.</strong> An underlying continuous trait
+          (e.g., disease severity, intelligence) may manifest only as a binary or ordinal
+          observation (e.g., sick/healthy, exam grade). The latent variable represents the
+          unobservable continuous quantity.
+        </li>
+        <li>
+          <strong>Theoretical constructs.</strong> Quantities such as "anxiety", "social
+          capital", or "market sentiment" are not directly measurable. They are operationalised
+          as latent variables that explain correlations among measurable indicators.
+        </li>
+        <li>
+          <strong>Computational tools.</strong> Even when a quantity is in principle observable,
+          treating it as latent can make computation tractable — as in data augmentation for
+          MCMC or the EM algorithm for mixture models.
+        </li>
+      </ol>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 4.1 — Galaxy Velocities: Hidden Clusters</div>
+        <p>
+          The <code>galaxies</code> dataset (Roeder 1990) contains velocities (km/s) of
+          82 galaxies from a redshift survey. A histogram of the velocities is distinctly
+          multimodal, suggesting the galaxies belong to several distinct clusters (superclusters).
+          The cluster membership is the latent variable.
+        </p>
+        <div class="code-label">R</div>
+        <pre><code class="language-r">library(MASS)
+data(galaxies)
+
+# Kernel density estimates with two bandwidths
+par(mfrow = c(1, 2))
+plot(density(galaxies, bw = "nrd0"),
+     main = "Bandwidth: nrd0", xlab = "Velocity (km/s)")
+plot(density(galaxies, bw = "SJ"),
+     main = "Bandwidth: SJ",   xlab = "Velocity (km/s)")
+# Different bandwidths reveal 3-4 clear modes</code></pre>
+        <p>
+          The multimodal shape is the signature of a <strong>finite mixture model</strong>:
+          each mode corresponds to one latent cluster of galaxies. Section 4.3 develops
+          this formally.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="lv-models">4.2 A Taxonomy of Latent Variable Models</h2>
+
+      <p>
+        The type of latent variable and the type of observed data together determine
+        which model class is appropriate:
+      </p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Latent $U$</th>
+              <th>Observed $Y$</th>
+              <th>Model class</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Discrete (finite)</td>
+              <td>Continuous or discrete</td>
+              <td>Finite mixture model</td>
+            </tr>
+            <tr>
+              <td>Discrete (sequence)</td>
+              <td>Sequence</td>
+              <td>Hidden Markov model</td>
+            </tr>
+            <tr>
+              <td>Continuous</td>
+              <td>Discrete (coarsened)</td>
+              <td>Probit / ordered probit; censored/truncated regression</td>
+            </tr>
+            <tr>
+              <td>Continuous (vector)</td>
+              <td>Continuous (vector)</td>
+              <td>Factor analysis; IRT; GNLMM</td>
+            </tr>
+            <tr>
+              <td>Continuous (cluster)</td>
+              <td>Continuous or discrete</td>
+              <td>Mixed models (Chapter 2)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="probit">Probit Regression as a Latent Variable Model</h3>
+
+      <p>
+        Binary regression has a natural latent variable interpretation. Suppose an individual $i$
+        has a latent propensity $U_i \sim \mathrm{N}(\mathbf{x}_i^\top \boldsymbol{\beta}, 1)$.
+        We observe only whether this propensity exceeds a threshold:
+        $$Y_i = \mathbf{1}(U_i \geq 0)$$
+        Then:
+        $$P(Y_i = 1 \mid \mathbf{x}_i) = P(U_i \geq 0) = P\!\left(Z \geq -\mathbf{x}_i^\top\boldsymbol{\beta}\right) = \Phi(\mathbf{x}_i^\top\boldsymbol{\beta})$$
+        where $Z \sim \mathrm{N}(0,1)$. This is exactly the <strong>probit model</strong>.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">💡 Three binary regression models from one latent variable idea</div>
+        <p>Changing the latent variable distribution changes the binary regression model:</p>
+        <ul>
+          <li>$U_i \sim \mathrm{N}(\mathbf{x}_i^\top\boldsymbol{\beta}, 1)$ → <strong>Probit</strong>: link $= \Phi^{-1}$</li>
+          <li>$U_i \sim \mathrm{Logistic}(\mathbf{x}_i^\top\boldsymbol{\beta}, 1)$ → <strong>Logistic regression</strong>: link $= \mathrm{logit}$</li>
+          <li>$U_i \sim \mathrm{Gumbel}(\mathbf{x}_i^\top\boldsymbol{\beta}, 1)$ → <strong>Complementary log-log</strong>: link $= \log(-\log(1-\cdot))$</li>
+        </ul>
+        <p>
+          All three give similar fitted probabilities in the middle of the range; they differ
+          mainly in the tails.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="mixtures">4.3 Finite Mixture Models</h2>
+
+      <p>
+        A <strong>finite mixture model</strong> assumes the observed data $Y$ come from one
+        of $K$ component distributions, where the component identity $U \in \{1, \ldots, K\}$
+        is latent.
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 4.1 — Finite Mixture Model</div>
+        <p>
+          The density of a $K$-component finite mixture is:
+        </p>
+        $$f(y;\, \boldsymbol{\pi}, \boldsymbol{\theta}) = \sum_{k=1}^K \pi_k\, f_k(y;\, \theta_k)$$
+        <p>where:</p>
+        <ul>
+          <li>$\pi_k \geq 0$, $\sum_k \pi_k = 1$ — mixing weights (prior probabilities of component $k$)</li>
+          <li>$f_k(y;\theta_k)$ — component density with parameter $\theta_k$</li>
+          <li>$U \sim \mathrm{Categorical}(\pi_1, \ldots, \pi_K)$ is the latent component label</li>
+          <li>$Y \mid U = k \sim f_k(\cdot;\theta_k)$</li>
+        </ul>
+      </div>
+
+      <h3 id="mixture-examples">Common Mixture Specifications</h3>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Components $f_k$</th><th>Parameters $\theta_k$</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Gaussian mixture</td>
+              <td>$\mathrm{N}(\mu_k, \sigma_k^2)$</td>
+              <td>$(\mu_k, \sigma_k^2)$</td>
+            </tr>
+            <tr>
+              <td>Poisson mixture</td>
+              <td>$\mathrm{Poisson}(\lambda_k)$</td>
+              <td>$\lambda_k$</td>
+            </tr>
+            <tr>
+              <td>Mixture of regressions</td>
+              <td>$\mathrm{N}(\mathbf{x}^\top\boldsymbol{\beta}_k, \sigma_k^2)$</td>
+              <td>$(\boldsymbol{\beta}_k, \sigma_k^2)$</td>
+            </tr>
+            <tr>
+              <td>Latent class analysis</td>
+              <td>Product of Bernoullis</td>
+              <td>$K$ vectors of item probabilities</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="mixture-issues">Non-Regularity Issues</h3>
+
+      <p>
+        Finite mixture models suffer from identifiability problems that make standard
+        MLE theory break down:
+      </p>
+
+      <ol>
+        <li>
+          <strong>Label switching:</strong> Permuting the component labels gives the same
+          likelihood. The mixture $\pi_1 f_1 + \pi_2 f_2$ is identical to $\pi_2 f_2 + \pi_1 f_1$.
+          This creates $K!$ equivalent global maxima.
+        </li>
+        <li>
+          <strong>Degenerate components:</strong> For Gaussian mixtures, setting $\sigma_k^2 \to 0$
+          and $\mu_k = y_i$ for a single observation makes $f_k(y_i;\theta_k) \to \infty$,
+          so the likelihood is <em>unbounded</em>. The global MLE does not exist without constraints.
+        </li>
+        <li>
+          <strong>Redundant components:</strong> Setting $\pi_k = 0$ removes component $k$
+          entirely, making $\theta_k$ non-identifiable.
+        </li>
+      </ol>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Practical consequences</div>
+        <p>
+          Always constrain $\sigma_k^2 \geq \sigma^2_{\min} > 0$ to prevent degeneracy.
+          Use multiple random restarts to explore the likelihood surface.
+          Standard likelihood ratio tests for the number of components $K$ are invalid
+          (the regularity conditions of Theorem 1.2 do not hold here).
+          Use BIC or bootstrap likelihood ratio tests instead.
+        </p>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="em">4.4 The Expectation–Maximisation Algorithm</h2>
+
+      <p>
+        The EM algorithm (Dempster, Laird and Rubin, 1977) is a general-purpose tool for
+        computing MLEs when the data are incomplete — either literally (missing observations)
+        or conceptually (the latent variable $U$ is unobserved). It is one of the most
+        widely used algorithms in statistics and machine learning.
+      </p>
+
+      <h3 id="em-setup">Setup: Complete vs. Observed Data</h3>
+
+      <p>
+        Let $\mathbf{y}$ be the <strong>observed data</strong> and $\mathbf{u}$ be the
+        <strong>missing/latent data</strong>. Together $(\mathbf{y}, \mathbf{u})$
+        constitute the <strong>complete data</strong>. Define:
+      </p>
+      <ul>
+        <li>$\ell(\boldsymbol{\theta}) = \log f(\mathbf{y};\boldsymbol{\theta})$ — observed-data log-likelihood (what we want to maximise)</li>
+        <li>$\ell_c(\boldsymbol{\theta}) = \log f(\mathbf{y}, \mathbf{u};\boldsymbol{\theta})$ — complete-data log-likelihood (easier to maximise)</li>
+      </ul>
+
+      <p>The key identity linking them:</p>
+      $$\ell_c(\boldsymbol{\theta}) = \ell(\boldsymbol{\theta}) + \log f(\mathbf{u} \mid \mathbf{y};\boldsymbol{\theta})$$
+
+      <h3 id="em-derivation">Deriving the EM Algorithm from First Principles</h3>
+
+      <p>
+        Take the expectation of both sides with respect to $f(\mathbf{u} \mid \mathbf{y}; \boldsymbol{\theta}')$,
+        where $\boldsymbol{\theta}'$ is the <em>current</em> parameter estimate:
+      </p>
+
+      $$\mathbb{E}_{\boldsymbol{\theta}'}\!\left[\ell_c(\boldsymbol{\theta}) \mid \mathbf{y}\right] = \ell(\boldsymbol{\theta}) + \mathbb{E}_{\boldsymbol{\theta}'}\!\left[\log f(\mathbf{U} \mid \mathbf{y};\boldsymbol{\theta}) \mid \mathbf{y}\right]$$
+
+      <p>Define the two functions:</p>
+      $$Q(\boldsymbol{\theta}; \boldsymbol{\theta}') = \mathbb{E}_{\boldsymbol{\theta}'}\!\left[\ell_c(\boldsymbol{\theta}) \mid \mathbf{y}\right]$$
+      $$H(\boldsymbol{\theta}; \boldsymbol{\theta}') = \mathbb{E}_{\boldsymbol{\theta}'}\!\left[\log f(\mathbf{U} \mid \mathbf{y};\boldsymbol{\theta}) \mid \mathbf{y}\right]$$
+
+      <p>So we always have:</p>
+      $$\ell(\boldsymbol{\theta}) = Q(\boldsymbol{\theta};\boldsymbol{\theta}') - H(\boldsymbol{\theta};\boldsymbol{\theta}')$$
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 4.1 — Monotone Ascent of EM</div>
+        <p>
+          Let $\boldsymbol{\theta}^{(t+1)} = \arg\max_{\boldsymbol{\theta}} Q(\boldsymbol{\theta}; \boldsymbol{\theta}^{(t)})$
+          be the EM update. Then:
+        </p>
+        $$\ell(\boldsymbol{\theta}^{(t+1)}) \geq \ell(\boldsymbol{\theta}^{(t)})$$
+        <p>
+          That is, the observed-data log-likelihood is <strong>non-decreasing</strong>
+          at every EM iteration. Equality holds only at a fixed point.
+        </p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof of Theorem 4.1 — EM never decreases the likelihood</summary>
+        <div class="proof-body">
+          <p>Using $\ell(\boldsymbol{\theta}) = Q(\boldsymbol{\theta};\boldsymbol{\theta}') - H(\boldsymbol{\theta};\boldsymbol{\theta}')$:</p>
+          $$\ell(\boldsymbol{\theta}^{(t+1)}) - \ell(\boldsymbol{\theta}^{(t)})$$
+          $$= \underbrace{\left[Q(\boldsymbol{\theta}^{(t+1)};\boldsymbol{\theta}^{(t)}) - Q(\boldsymbol{\theta}^{(t)};\boldsymbol{\theta}^{(t)})\right]}_{\geq\, 0 \text{ (M-step)}} - \underbrace{\left[H(\boldsymbol{\theta}^{(t+1)};\boldsymbol{\theta}^{(t)}) - H(\boldsymbol{\theta}^{(t)};\boldsymbol{\theta}^{(t)})\right]}_{\leq\, 0 \text{ (shown below)}}$$
+          <p>
+            The M-step guarantees the first bracket is $\geq 0$ by definition.
+            For the second bracket, using the non-negativity of KL divergence:
+          </p>
+          $$H(\boldsymbol{\theta}^{(t+1)};\boldsymbol{\theta}^{(t)}) - H(\boldsymbol{\theta}^{(t)};\boldsymbol{\theta}^{(t)})$$
+          $$= \mathbb{E}_{\boldsymbol{\theta}^{(t)}}\!\left[\log \frac{f(\mathbf{U}\mid\mathbf{y};\boldsymbol{\theta}^{(t+1)})}{f(\mathbf{U}\mid\mathbf{y};\boldsymbol{\theta}^{(t)})}\Bigg|\mathbf{y}\right] \leq \log \mathbb{E}\!\left[\frac{f(\mathbf{U}\mid\mathbf{y};\boldsymbol{\theta}^{(t+1)})}{f(\mathbf{U}\mid\mathbf{y};\boldsymbol{\theta}^{(t)})}\right] = \log 1 = 0$$
+          <p>
+            by Jensen's inequality (log is concave). Therefore:
+          </p>
+          $$\ell(\boldsymbol{\theta}^{(t+1)}) - \ell(\boldsymbol{\theta}^{(t)}) \geq 0 - 0 = 0$$
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <h3 id="em-algorithm">The EM Algorithm</h3>
+
+      <div class="callout note">
+        <div class="callout-title">📐 EM Algorithm — Formal Statement</div>
+        <ol class="steps">
+          <li>
+            <strong>Initialise</strong> $\boldsymbol{\theta}^{(0)}$ (randomly or using method of moments).
+          </li>
+          <li>
+            <strong>E-step (Expectation):</strong>
+            Compute $Q(\boldsymbol{\theta};\boldsymbol{\theta}^{(t)}) = \mathbb{E}_{\boldsymbol{\theta}^{(t)}}\!\left[\ell_c(\boldsymbol{\theta}) \mid \mathbf{y}\right]$
+            <br>This requires computing the conditional distribution $f(\mathbf{u}\mid\mathbf{y};\boldsymbol{\theta}^{(t)})$
+            and taking the expectation of the complete-data log-likelihood.
+          </li>
+          <li>
+            <strong>M-step (Maximisation):</strong>
+            $\boldsymbol{\theta}^{(t+1)} = \arg\max_{\boldsymbol{\theta}} Q(\boldsymbol{\theta};\boldsymbol{\theta}^{(t)})$
+          </li>
+          <li>
+            <strong>Convergence check:</strong> Stop if
+            $|\ell(\boldsymbol{\theta}^{(t+1)}) - \ell(\boldsymbol{\theta}^{(t)})| < \epsilon$
+            or $\|\boldsymbol{\theta}^{(t+1)} - \boldsymbol{\theta}^{(t)}\| < \delta$.
+            Otherwise return to Step 2 with $t \leftarrow t+1$.
+          </li>
+        </ol>
+      </div>
+
+      <h3 id="em-convergence">Convergence Properties</h3>
+
+      <p>
+        EM is guaranteed to converge to a <em>stationary point</em> (local maximum, saddle point,
+        or global maximum) of $\ell(\boldsymbol{\theta})$, but not necessarily the global maximum.
+      </p>
+
+      <p><strong>Rate of convergence:</strong> EM converges linearly (not quadratically like Newton's
+      method). The rate is governed by the <strong>fraction of missing information</strong>:</p>
+      $$r = \text{largest eigenvalue of } \mathcal{I}(\hat{\boldsymbol{\theta}})^{-1} \mathcal{I}_m(\hat{\boldsymbol{\theta}})$$
+      <p>
+        where $\mathcal{I}$ is the observed information and $\mathcal{I}_m$ is the
+        "missing" information. When $r \approx 1$ (nearly all information is missing),
+        EM is very slow. When $r \approx 0$ (little information is missing), EM is fast.
+      </p>
+
+      <h3 id="em-missing-info">The Missing Information Principle</h3>
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 4.2 — Missing Information Principle</div>
+        <p>At any $\boldsymbol{\theta}$:</p>
+        $$\underbrace{J(\boldsymbol{\theta})}_{\text{observed info}} = \underbrace{\mathcal{I}_c(\boldsymbol{\theta})}_{\text{complete-data info}} - \underbrace{\mathcal{I}_m(\boldsymbol{\theta})}_{\text{missing info}}$$
+        <p>where $\mathcal{I}_c(\boldsymbol{\theta}) = -\mathbb{E}[\partial^2\ell_c/\partial\boldsymbol{\theta}^2 \mid \mathbf{y}]$
+        and $\mathcal{I}_m(\boldsymbol{\theta}) = -\mathbb{E}[\partial^2 \log f(\mathbf{U}\mid\mathbf{y};\boldsymbol{\theta})/\partial\boldsymbol{\theta}^2 \mid \mathbf{y}]$.</p>
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof of the Missing Information Principle</summary>
+        <div class="proof-body">
+          <p>Differentiate the identity $\ell_c(\boldsymbol{\theta}) = \ell(\boldsymbol{\theta}) + \log f(\mathbf{u}\mid\mathbf{y};\boldsymbol{\theta})$ twice with respect to $\boldsymbol{\theta}$:</p>
+          $$\frac{\partial^2 \ell_c}{\partial\boldsymbol{\theta}^2} = \frac{\partial^2 \ell}{\partial\boldsymbol{\theta}^2} + \frac{\partial^2 \log f(\mathbf{u}\mid\mathbf{y};\boldsymbol{\theta})}{\partial\boldsymbol{\theta}^2}$$
+          <p>Take the conditional expectation given $\mathbf{y}$ under $\boldsymbol{\theta}$:</p>
+          $$\mathbb{E}\!\left[\frac{\partial^2\ell_c}{\partial\boldsymbol{\theta}^2}\Big|\mathbf{y}\right] = \frac{\partial^2\ell}{\partial\boldsymbol{\theta}^2} + \mathbb{E}\!\left[\frac{\partial^2 \log f(\mathbf{U}\mid\mathbf{y};\boldsymbol{\theta})}{\partial\boldsymbol{\theta}^2}\Big|\mathbf{y}\right]$$
+          <p>Multiply through by $-1$:</p>
+          $$\mathcal{I}_c(\boldsymbol{\theta}) = J(\boldsymbol{\theta}) + \mathcal{I}_m(\boldsymbol{\theta})$$
+          <p>Rearranging gives the result.</p>
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="em-mixtures">4.5 EM for Gaussian Mixture Models</h2>
+
+      <p>
+        The most famous application of EM: fitting a $K$-component Gaussian mixture.
+        Let $Y_1, \ldots, Y_n \overset{\mathrm{i.i.d.}}{\sim} \sum_{k=1}^K \pi_k \, \mathrm{N}(\mu_k, \sigma_k^2)$.
+        The latent variables are the component labels $U_i \in \{1,\ldots,K\}$.
+      </p>
+
+      <h3 id="complete-data-ll">Complete-Data Log-Likelihood</h3>
+
+      <p>
+        Introduce indicator variables $Z_{ik} = \mathbf{1}(U_i = k)$. The complete data is
+        $\{(y_i, z_{i1}, \ldots, z_{iK})\}_{i=1}^n$. The complete-data log-likelihood factors as:
+      </p>
+      $$\ell_c(\boldsymbol{\pi}, \boldsymbol{\mu}, \boldsymbol{\sigma}^2) = \sum_{i=1}^n\sum_{k=1}^K Z_{ik} \left[\log\pi_k + \log\phi(y_i;\mu_k,\sigma_k^2)\right]$$
+      <p>where $\phi(y;\mu,\sigma^2) = (2\pi\sigma^2)^{-1/2}\exp(-(y-\mu)^2/(2\sigma^2))$.</p>
+
+      <h3 id="e-step">E-Step: Computing Responsibilities</h3>
+
+      <p>
+        The E-step replaces each $Z_{ik}$ by its conditional expectation given $\mathbf{y}$ and
+        current parameters $\boldsymbol{\theta}^{(t)} = (\boldsymbol{\pi}^{(t)}, \boldsymbol{\mu}^{(t)}, \boldsymbol{\sigma}^{2(t)})$:
+      </p>
+      $$w_{ik}^{(t)} = \mathbb{E}[Z_{ik} \mid y_i; \boldsymbol{\theta}^{(t)}] = P(U_i = k \mid y_i; \boldsymbol{\theta}^{(t)})$$
+
+      <p>By Bayes' theorem:</p>
+      $$\boxed{w_{ik}^{(t)} = \frac{\pi_k^{(t)}\, \phi(y_i;\mu_k^{(t)},\sigma_k^{2(t)})}{\sum_{j=1}^K \pi_j^{(t)}\, \phi(y_i;\mu_j^{(t)},\sigma_j^{2(t)})}}$$
+
+      <p>
+        These are called <strong>responsibilities</strong>: $w_{ik}^{(t)}$ is the probability
+        that observation $y_i$ was generated by component $k$, given the current parameters.
+      </p>
+
+      <h3 id="m-step">M-Step: Updating Parameters</h3>
+
+      <p>
+        Maximise $Q(\boldsymbol{\theta};\boldsymbol{\theta}^{(t)}) = \sum_i\sum_k w_{ik}^{(t)}[\log\pi_k + \log\phi(y_i;\mu_k,\sigma_k^2)]$
+        over $(\boldsymbol{\pi}, \boldsymbol{\mu}, \boldsymbol{\sigma}^2)$.
+      </p>
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 4.3 — M-Step Closed-Form Updates for Gaussian Mixtures</div>
+        <p>The M-step solutions are:</p>
+        $$\pi_k^{(t+1)} = \frac{1}{n}\sum_{i=1}^n w_{ik}^{(t)} \qquad \text{(weighted proportion in component } k\text{)}$$
+        $$\mu_k^{(t+1)} = \frac{\sum_{i=1}^n w_{ik}^{(t)} y_i}{\sum_{i=1}^n w_{ik}^{(t)}} \qquad \text{(responsibility-weighted mean)}$$
+        $$\sigma_k^{2(t+1)} = \frac{\sum_{i=1}^n w_{ik}^{(t)} (y_i - \mu_k^{(t+1)})^2}{\sum_{i=1}^n w_{ik}^{(t)}} \qquad \text{(responsibility-weighted variance)}$$
+      </div>
+
+      <details class="proof-details">
+        <summary>Proof of Theorem 4.3</summary>
+        <div class="proof-body">
+          <p><strong>Mixing weights:</strong> Maximise $\sum_k (\sum_i w_{ik})\log\pi_k$ subject to $\sum_k \pi_k = 1$ using a Lagrange multiplier $\lambda$:</p>
+          $$\frac{\partial}{\partial\pi_k}\left[\sum_j n_j \log\pi_j - \lambda(\sum_j\pi_j - 1)\right] = \frac{n_k}{\pi_k} - \lambda = 0$$
+          <p>where $n_k = \sum_i w_{ik}$. So $\pi_k = n_k/\lambda$. Since $\sum_k\pi_k=1$, we get $\lambda = n$, giving $\pi_k = n_k/n$.</p>
+
+          <p><strong>Means:</strong> Differentiate $\sum_i w_{ik}\log\phi(y_i;\mu_k,\sigma_k^2) = -\frac{1}{2\sigma_k^2}\sum_i w_{ik}(y_i-\mu_k)^2 + \mathrm{const}$ with respect to $\mu_k$:</p>
+          $$\frac{\partial}{\partial\mu_k} = \frac{1}{\sigma_k^2}\sum_i w_{ik}(y_i - \mu_k) = 0 \implies \mu_k = \frac{\sum_i w_{ik} y_i}{\sum_i w_{ik}}$$
+
+          <p><strong>Variances:</strong> Differentiate with respect to $\sigma_k^2$:</p>
+          $$\frac{\partial}{\partial\sigma_k^2} = -\frac{n_k}{2\sigma_k^2} + \frac{1}{2\sigma_k^4}\sum_i w_{ik}(y_i-\mu_k)^2 = 0 \implies \sigma_k^2 = \frac{\sum_i w_{ik}(y_i-\mu_k)^2}{n_k}$$
+          <div class="qed">□</div>
+        </div>
+      </details>
+
+      <div class="callout note">
+        <div class="callout-title">💡 Beautiful interpretation of EM for mixtures</div>
+        <p>
+          EM for Gaussian mixtures alternates between two intuitive steps:
+        </p>
+        <ul>
+          <li><strong>E-step:</strong> "Given these component parameters, how likely is each observation to belong to each component?" → Update responsibilities $w_{ik}$.</li>
+          <li><strong>M-step:</strong> "Given these soft cluster assignments, what are the best component parameters?" → Update $\mu_k$, $\sigma_k^2$, $\pi_k$ as weighted statistics.</li>
+        </ul>
+        <p>
+          This is a <strong>soft version of K-means clustering</strong>. K-means assigns each point
+          to exactly one cluster (hard assignment); EM assigns fractional responsibilities (soft assignment).
+        </p>
+      </div>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 4.2 — EM for Gaussian Mixture (from scratch in R)</div>
+        <div class="code-label">R</div>
+        <pre><code class="language-r"># ── Implement EM for a 2-component Gaussian mixture ──────────────
+em_gaussian_mixture <- function(y, K = 2, max_iter = 200, tol = 1e-8) {
+  n <- length(y)
+
+  # Initialise: random responsibilities
+  set.seed(42)
+  w <- matrix(runif(n * K), nrow = n, ncol = K)
+  w <- w / rowSums(w)
+
+  params <- list()
+  loglik_trace <- numeric(max_iter)
+
+  for (iter in seq_len(max_iter)) {
+    # ── M-step ──────────────────────────────────────────────────
+    nk  <- colSums(w)                          # effective cluster sizes
+    pi  <- nk / n                              # mixing weights
+    mu  <- colSums(w * y) / nk                 # weighted means
+    sig2 <- sapply(1:K, function(k)            # weighted variances
+      sum(w[,k] * (y - mu[k])^2) / nk[k])
+
+    # ── E-step ──────────────────────────────────────────────────
+    dens <- sapply(1:K, function(k) pi[k] * dnorm(y, mu[k], sqrt(sig2[k])))
+    total_dens <- rowSums(dens)
+    w <- dens / total_dens                     # responsibilities
+
+    # ── Log-likelihood ──────────────────────────────────────────
+    loglik_trace[iter] <- sum(log(total_dens))
+
+    # ── Convergence ─────────────────────────────────────────────
+    if (iter > 1 && abs(loglik_trace[iter] - loglik_trace[iter-1]) < tol) {
+      loglik_trace <- loglik_trace[1:iter]
+      break
+    }
+  }
+
+  list(pi = pi, mu = mu, sigma = sqrt(sig2), w = w,
+       loglik = loglik_trace, n_iter = length(loglik_trace))
+}
+
+# Apply to galaxy data
+library(MASS)
+data(galaxies)
+fit_em2 <- em_gaussian_mixture(galaxies, K = 2)
+fit_em4 <- em_gaussian_mixture(galaxies, K = 4)
+
+cat("2-component EM: mu =", round(fit_em2$mu), "\n")
+cat("4-component EM: mu =", round(fit_em4$mu), "\n")
+
+# Compare via BIC (manually)
+bic_k <- function(fit, y, K) {
+  n <- length(y); p <- 3*K - 1  # K means, K variances, K-1 free weights
+  -2 * tail(fit$loglik, 1) + p * log(n)
+}
+cat("BIC K=2:", bic_k(fit_em2, galaxies, 2), "\n")
+cat("BIC K=4:", bic_k(fit_em4, galaxies, 4), "\n")</code></pre>
+      </div>
+
+      <h3 id="mclust">Using the <code>mclust</code> Package</h3>
+
+      <p>
+        The <code>mclust</code> package provides a comprehensive, production-quality
+        implementation with automatic selection of $K$ and the covariance structure:
+      </p>
+
+      <div class="code-label">R</div>
+      <pre><code class="language-r">library(mclust)
+
+# Fit mixture models with K = 1 to 10 components
+fit_mclust <- Mclust(galaxies, G = 1:10)
+
+# Best K by BIC
+summary(fit_mclust)
+plot(fit_mclust, what = "BIC")
+plot(fit_mclust, what = "classification")
+plot(fit_mclust, what = "uncertainty")
+
+# Fitted densities
+plot(fit_mclust, what = "density")</code></pre>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="em-exponential-family">4.6 EM for Exponential Family Complete Data</h2>
+
+      <p>
+        When the complete-data density belongs to an exponential family, the EM algorithm
+        takes a particularly elegant and unified form.
+      </p>
+
+      <div class="callout definition">
+        <div class="callout-title">📖 Definition 4.2 — Exponential Family Complete Data</div>
+        <p>
+          Suppose $\log f(\mathbf{y},\mathbf{u};\boldsymbol{\theta})$ has the form:
+        </p>
+        $$\log f(\mathbf{y},\mathbf{u};\boldsymbol{\theta}) = \mathbf{s}(\mathbf{y},\mathbf{u})^\top \boldsymbol{\theta} - \kappa(\boldsymbol{\theta}) + c(\mathbf{y},\mathbf{u})$$
+        <p>
+          where $\mathbf{s}(\mathbf{y},\mathbf{u})$ is the <strong>complete-data sufficient statistic</strong>
+          and $\kappa(\boldsymbol{\theta})$ is the log-partition function.
+        </p>
+      </div>
+
+      <div class="callout theorem">
+        <div class="callout-title">📐 Theorem 4.4 — EM in Exponential Families</div>
+        <p>For exponential family complete data:</p>
+        <ul>
+          <li>
+            <strong>E-step:</strong> Compute
+            $\mathbf{s}^{(t)} = \mathbb{E}_{\boldsymbol{\theta}^{(t)}}[\mathbf{s}(\mathbf{y},\mathbf{U}) \mid \mathbf{y}]$
+            (replace the complete-data sufficient statistic by its conditional expectation)
+          </li>
+          <li>
+            <strong>M-step:</strong> Solve $\nabla_{\boldsymbol{\theta}} \kappa(\boldsymbol{\theta}) = \mathbf{s}^{(t)}$
+            (match expected sufficient statistics to their natural values)
+          </li>
+        </ul>
+        <p>
+          This means we can reuse any existing complete-data fitting routine, simply replacing
+          $\mathbf{s}$ by its conditional expectation $\mathbf{s}^{(t)}$.
+        </p>
+      </div>
+
+      <div class="callout example">
+        <div class="callout-title">💼 Example 4.3 — Negative Binomial via EM</div>
+        <p>
+          The Negative Binomial arises as a Poisson–Gamma mixture:
+          $Y \mid U \sim \mathrm{Poisson}(U)$ and $U \sim \mathrm{Gamma}(\nu, \nu/\mu)$.
+          The complete data is $(y, u)$.
+        </p>
+        <p><strong>Complete-data log-likelihood:</strong></p>
+        $$\ell_c(\mu, \nu) = y\log u - u - \log y! + \nu\log(\nu/\mu) + (\nu-1)\log u - \nu u/\mu - \log\Gamma(\nu)$$
+        <p><strong>E-step:</strong> We need $\mathbb{E}[U \mid Y=y]$ and $\mathbb{E}[\log U \mid Y=y]$. Since $U \mid Y=y \sim \mathrm{Gamma}(y+\nu, (1+\nu/\mu)^{-1})$:</p>
+        $$\mathbb{E}[U \mid y] = \frac{y + \nu}{1 + \nu/\mu} = \frac{\mu(y+\nu)}{\mu + \nu}$$
+        $$\mathbb{E}[\log U \mid y] = \psi(y+\nu) - \log(1 + \nu/\mu)$$
+        <p>where $\psi$ is the digamma function.</p>
+        <p><strong>M-step:</strong> Update $\mu^{(t+1)}$ by differentiating $Q$ w.r.t. $\mu$:</p>
+        $$\mu^{(t+1)} = \frac{1}{n}\sum_{i=1}^n \mathbb{E}[U_i \mid y_i; \boldsymbol{\theta}^{(t)}] = \frac{1}{n}\sum_{i=1}^n \frac{\mu^{(t)}(y_i + \nu^{(t)})}{\mu^{(t)} + \nu^{(t)}}$$
+        <div class="code-label">R</div>
+        <pre><code class="language-r"># EM for Negative Binomial (fixed nu, update mu only for illustration)
+em_negbin_mu <- function(y, nu, mu_init = mean(y), max_iter = 100) {
+  mu <- mu_init
+  for (t in seq_len(max_iter)) {
+    # E-step: E[U|y]
+    eu <- mu * (y + nu) / (mu + nu)
+    # M-step: mu = mean of E[U|y]
+    mu_new <- mean(eu)
+    if (abs(mu_new - mu) < 1e-10) break
+    mu <- mu_new
+  }
+  mu
+}
+
+# Generate data
+set.seed(1)
+y <- rnbinom(200, size = 3, mu = 10)
+cat("True mu = 10, EM estimate:", em_negbin_mu(y, nu = 3), "\n")
+cat("Direct MLE (mean):", mean(y), "\n")</code></pre>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="data-augmentation">4.7 Data Augmentation and Bayesian EM</h2>
+
+      <p>
+        The EM philosophy extends naturally to Bayesian computation via
+        <strong>data augmentation</strong> (Tanner and Wong, 1987).
+        Instead of maximising the posterior, we sample from it using a Gibbs sampler that
+        alternates between:
+      </p>
+
+      <ol class="steps">
+        <li>
+          <strong>Augmentation step (A-step):</strong> Sample the missing data
+          $\mathbf{u}^{(t)} \sim f(\mathbf{u} \mid \mathbf{y}, \boldsymbol{\theta}^{(t)})$
+          (analogous to the E-step, but sampling rather than taking expectations).
+        </li>
+        <li>
+          <strong>Posterior step (P-step):</strong> Sample the parameters
+          $\boldsymbol{\theta}^{(t+1)} \sim \pi(\boldsymbol{\theta} \mid \mathbf{y}, \mathbf{u}^{(t)})$
+          (analogous to the M-step, but sampling from the complete-data posterior).
+        </li>
+      </ol>
+
+      <p>
+        The resulting chain $\{(\boldsymbol{\theta}^{(t)}, \mathbf{u}^{(t)})\}$ converges to
+        samples from the joint posterior $\pi(\boldsymbol{\theta}, \mathbf{u} \mid \mathbf{y})$.
+        Marginalising over $\mathbf{u}$ gives samples from $\pi(\boldsymbol{\theta} \mid \mathbf{y})$.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">💡 EM vs. Data Augmentation</div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th></th><th>EM (frequentist)</th><th>Data Augmentation (Bayesian)</th></tr></thead>
+            <tbody>
+              <tr><td>Goal</td><td>Maximise $\ell(\boldsymbol{\theta})$</td><td>Sample from $\pi(\boldsymbol{\theta}\mid\mathbf{y})$</td></tr>
+              <tr><td>E/A-step</td><td>Compute $\mathbb{E}[\ell_c \mid \mathbf{y}]$</td><td>Sample $\mathbf{u}^{(t)} \sim f(\mathbf{u}\mid\mathbf{y},\boldsymbol{\theta}^{(t)})$</td></tr>
+              <tr><td>M/P-step</td><td>Maximise over $\boldsymbol{\theta}$</td><td>Sample $\boldsymbol{\theta}^{(t+1)} \sim \pi(\boldsymbol{\theta}\mid\mathbf{y},\mathbf{u}^{(t)})$</td></tr>
+              <tr><td>Output</td><td>Point estimate $\hat{\boldsymbol{\theta}}$</td><td>Posterior distribution</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <h2 id="summary">Chapter Summary</h2>
+
+      <div class="key-points">
+        <h4>Key Points from Chapter 4</h4>
+        <ul>
+          <li>
+            A <strong>latent variable</strong> is unobserved but influences the data distribution.
+            It may represent a hidden quantity, a theoretical construct, or a computational device.
+          </li>
+          <li>
+            <strong>Finite mixture models</strong> express the marginal density as a weighted sum
+            of component densities. The latent variable is the component label $U_i \in \{1,\ldots,K\}$.
+          </li>
+          <li>
+            The <strong>EM algorithm</strong> iterates between an E-step (replace latent data by
+            conditional expectations) and an M-step (maximise the expected complete-data
+            log-likelihood). It is guaranteed to non-decrease $\ell(\boldsymbol{\theta})$ at
+            every iteration.
+          </li>
+          <li>
+            For Gaussian mixtures, the E-step computes <strong>responsibilities</strong> $w_{ik}$
+            and the M-step gives weighted sample statistics in closed form.
+          </li>
+          <li>
+            For exponential family complete data, EM reduces to replacing sufficient statistics
+            by their conditional expectations — allowing reuse of standard fitting routines.
+          </li>
+          <li>
+            <strong>Data augmentation</strong> is the Bayesian analogue: sample rather than
+            compute expectations, producing full posterior distributions.
+          </li>
+        </ul>
+      </div>
+
+      <div class="chapter-nav">
+        <a href="nonlinear.html">
+          <span class="nav-label">← Previous</span>
+          <span class="nav-title">3 — Nonlinear Models</span>
+        </a>
+        <a href="lab1.html" class="next">
+          <span class="nav-label">Next →</span>
+          <span class="nav-title">Lab 1 — AIC &amp; BIC in Practice</span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <aside id="toc-sidebar">
+    <div class="toc-title">On this page</div>
+    <ul id="toc-list"></ul>
+  </aside>
+</div>
+
+<footer id="site-footer">
+  <span>Donnie — Statistical Modelling</span>
+  <span>License: <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/r.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script src="css/nav.js"></script>
+</body>
+</html>
